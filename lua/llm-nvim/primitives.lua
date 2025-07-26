@@ -224,6 +224,12 @@ function P.show_popup(label, cb)
 		vim.api.nvim_win_close(win, true)
 		cb(vim.trim(text))
 	end)
+	vim.schedule(function()
+		if vim.api.nvim_win_is_valid(win) then
+			vim.api.nvim_set_current_win(win)
+			vim.cmd("startinsert!")
+		end
+	end)
 	vim.keymap.set({ "n", "i" }, "<Esc><Esc>", function()
 		vim.api.nvim_win_close(win, true)
 		cb("")
