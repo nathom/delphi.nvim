@@ -77,7 +77,7 @@ local function after_fence(s)
 	end
 end
 local function before_fence(s)
-	local start_pos = s:find("```")
+	local start_pos = s:find("\n```")
 	if start_pos then
 		if start_pos > 1 then
 			return s:sub(1, start_pos - 1)
@@ -135,11 +135,17 @@ vim.api.nvim_create_user_command("Refactor", function()
 		}, "\n")
 
 		-- simple fence-aware streaming state
+		local Extractor = require("llm-nvim.extractor").Extractor
+		local extractor = Extractor.new()
+
+		-- local differ = require("llm-nvim.unidiff").Differ.new(sel.lines)
 		local diff = P.start_inline_diff(orig_buf, sel.start_lnum, sel.end_lnum, sel.lines)
 		local in_code = false
 
 		local full_response = ""
+		local fence_idx
 		local response = ""
+		local done = false
 		openai.chat({
 			model = "gpt-4o",
 			stream = true,
@@ -150,29 +156,21 @@ vim.api.nvim_create_user_command("Refactor", function()
 		}, {
 			on_chunk = vim.schedule_wrap(function(chunk)
 				local delta = chunk.choices[1].delta.content or ""
-				full_response = full_response .. delta
-				if not in_code then
-					local fence_idx = full_response:find("```", 1, true)
-					if fence_idx then
-						response = after_fence(full_response)
-						diff.push(response)
-						in_code = true
-					end
-				else
-					response = response .. before_fence(delta)
-					diff.push(before_fence(delta))
+				local new_code = extractor:update(delta)
+				if #new_code then
+					-- differ:update(new_code)
+					diff.push(new_code)
 				end
+				-- vim.notify(vim.inspect(differ:lines()))
 			end),
 
 			on_done = function()
-				vim.notify(response)
-				vim.notify(full_response)
 				local map = vim.keymap.set
-				map("n", "<leader>a", function()
+				map("n", "<space>a", function()
 					diff.accept()
 					vim.notify("applied")
 				end, { buffer = orig_buf })
-				map("n", "<leader>r", function()
+				map("n", "<space>r", function()
 					diff.reject()
 					vim.notify("rejected")
 				end, { buffer = orig_buf })

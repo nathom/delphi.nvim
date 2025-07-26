@@ -235,9 +235,8 @@ end
 local diff_ns = vim.api.nvim_create_namespace("myllm_inline_diff")
 
 function P.start_inline_diff(buf, start_lnum, end_lnum, left_lines)
-	local ud = require("llm-nvim.unidiff")
-	local differ = ud.Differ and ud.Differ.new or require("llm-nvim.unidiff").new
-	local d = differ(table.concat(left_lines, "\n"))
+	local Differ = require("llm-nvim.unidiff").Differ
+	local d = Differ.new(left_lines)
 	local orig = vim.deepcopy(left_lines) -- for reject()
 	local cur_end = end_lnum
 
@@ -255,7 +254,7 @@ function P.start_inline_diff(buf, start_lnum, end_lnum, left_lines)
 					diff_ns,
 					start_lnum + i - 2,
 					0,
-					{ virt_text = { { tag, hl } }, virt_text_pos = "overlay", hl_group = hl }
+					{ virt_text = { { l, hl } }, virt_text_pos = "overlay", hl_group = hl, invalidate = true }
 				)
 			end
 		end
