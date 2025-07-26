@@ -1,6 +1,5 @@
-local M = {} ----------------------------------------- public API
+local M = {}
 
------------------------------------------------------------------ helpers
 local function splitlines(text)
 	local t, i = {}, 1
 	for nl in text:gmatch("()\n") do

@@ -1,25 +1,3 @@
--- openai.lua – minimal OpenAI Chat Completions client for Neovim (≥0.10)
---
--- Design goals
---   * Zero external dependencies except curl & plenary (optional)
---   * Full async, non-blocking, works inside Neovim event loop
---   * Supports both blocking (non-stream) and streaming usage via callbacks
---   * Implements official OpenAI Chat Completions spec (2025-07-25 revision)
---
--- Public API
---   setup(cfg)                     → configure api_key, base_url, etc.
---   chat(args, cbs) → handle       → send request. If args.stream=true the
---                                     response is Server-Sent Events; chunks
---                                     arrive via cbs.on_chunk(JSON).
---                                     For non-stream, cbs.on_complete(JSON)
---                                     gets the full parsed body.
---                                     Returns the vim.system handle so the
---                                     caller may :kill() to cancel.
---
---   args  → table mirroring OpenAI /chat/completions payload
---   cbs   → { on_chunk = fn(chunk), on_complete = fn(resp),
---             on_done = fn(), on_error = fn(msg) }
---
 -- Example (streaming):
 --   local openai = require('openai')
 --   openai.setup{ api_key = os.getenv('OPENAI_API_KEY') }
@@ -71,13 +49,13 @@ end
 --- Send a chat completion request.
 ---@param body table   -- full JSON payload per OpenAI docs
 ---@param cb   table   -- {on_chunk, on_complete, on_done, on_error}
----@return userdata    -- vim.system handle (for cancellation)
+---@return vim.SystemObj?    -- vim.system handle (for cancellation)
 function M.chat(body, cb)
 	cb = cb or {}
 	if not cfg.api_key or cfg.api_key == "" then
 		local msg = "[openai.lua] Missing API key (setup{api_key=} or $OPENAI_API_KEY)";
 		(cb.on_error or vim.notify)(msg, vim.log.levels.ERROR)
-		return
+		return nil
 	end
 
 	local payload = vim.json.encode(body)
@@ -158,8 +136,6 @@ function M.chat(body, cb)
 		text = true,
 		timeout = cfg.timeout,
 		stdout = function(_, data)
-			-- print("stdout:")
-			-- print(data)
 			if body.stream then
 				handle_stream(data)
 			else
@@ -169,8 +145,6 @@ function M.chat(body, cb)
 			end
 		end,
 		stderr = function(_, data)
-			-- print("error:")
-			-- print(data)
 			if data then
 				stderr_acc[#stderr_acc + 1] = data
 			end

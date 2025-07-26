@@ -1,6 +1,3 @@
--- primitives.lua -------------------------------------------------------------
--- Minimal helpers for chat-buffer manipulation.  No extra dependencies.
-
 local P = {}
 
 local function starts_with(str, prefix)
@@ -34,7 +31,7 @@ function P.foldexpr(lnum)
 	end
 	return "=" -- inside a turn
 end
-_G.myllm_foldexpr = P.foldexpr -- expose for 'foldexpr'
+_G.myllm_foldexpr = P.foldexpr
 
 -- improved block parser ------------------------------------------------------
 ---@param input string
@@ -66,9 +63,6 @@ function P.to_messages(input)
 	return msgs
 end
 
--------------------------------------------------------------------------------
--- 2. Append one line to a buffer (at EOF, no newline added)
--------------------------------------------------------------------------------
 ---@param buf integer
 ---@param line string
 function P.append_line_to_buf(buf, line)
@@ -82,32 +76,20 @@ function P.append_chunk_to_buf(buf, chunk)
 		error(("append_chunk_to_buf: invalid buffer %s"):format(tostring(buf)))
 	end
 
-	-- Current trailing line to be extended.
 	local line_count = vim.api.nvim_buf_line_count(buf)
-	local last_idx = line_count - 1 -- zero-based
+	local last_idx = line_count - 1
 	local last_line = vim.api.nvim_buf_get_lines(buf, last_idx, last_idx + 1, false)[1] or ""
 
-	-- Split the incoming text *keeping* empty pieces so we can tell whether it
-	-- ended in “\n”.
 	local parts = vim.split(chunk, "\n", { plain = true, trimempty = false })
 
-	---------------------------------------------------------------------------
-	-- 1. Extend the current last line with the first fragment.
-	---------------------------------------------------------------------------
 	vim.api.nvim_buf_set_lines(buf, last_idx, last_idx + 1, false, { last_line .. parts[1] })
 
-	---------------------------------------------------------------------------
-	-- 2. Everything after the first “\n” becomes new lines.
-	---------------------------------------------------------------------------
 	if #parts > 1 then
-		-- unpack is available in LuaJIT / Luau used by Neovim
 		vim.api.nvim_buf_set_lines(buf, -1, -1, false, { unpack(parts, 2) })
 	end
 end
 
--------------------------------------------------------------------------------
--- 3. Move cursor to the last “User:” prompt in the given buffer
--------------------------------------------------------------------------------
+-- Move cursor to the last “User:” prompt in the given buffer
 ---@param buf integer
 function P.set_cursor_to_user(buf)
 	local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
@@ -124,9 +106,7 @@ function P.set_cursor_to_user(buf)
 	end
 end
 
--------------------------------------------------------------------------------
--- 4. Read entire buffer into a single string
--------------------------------------------------------------------------------
+-- Read entire buffer into a single string
 ---@param buf integer
 ---@return string
 function P.read_buf(buf)
@@ -137,7 +117,6 @@ function P.open_new_chat_buffer(system_prompt)
 	vim.cmd("enew") -- new buffer, same window
 	local buf = vim.api.nvim_get_current_buf()
 
-	-- make it scratch-like
 	vim.bo.buftype, vim.bo.bufhidden, vim.bo.filetype = "nofile", "hide", "markdown"
 	-- ▼ folding: one call, one liner ▼
 	-- vim.wo.foldmethod = "expr"
@@ -157,10 +136,6 @@ function P.open_new_chat_buffer(system_prompt)
 	return buf
 end
 
----------------------------------------------------------------------------
--- 5. Visual-selection helpers --------------------------------------------
----------------------------------------------------------------------------
-
 ---Return current visual selection (or current line if none).
 --- @param buf integer|nil
 --- @return table  -- { lines = {...}, start_lnum = n, end_lnum = n }
@@ -179,22 +154,6 @@ function P.get_visual_selection(buf)
 	return { lines = lines, start_lnum = s, end_lnum = e }
 end
 
----------------------------------------------------------------------------
--- 8. Popup prompt (async, Plenary) -----------------------------------------
--- Requires plenary.nvim (Popup module).
---
---  P.show_popup(label, callback) → win_id
---
---  • Opens a centred floating window headed by `label`.
---  • User types below the label.
---  • <CR>   → close popup, pass trimmed text to `callback(text)`.
---  • <Esc><Esc> → close popup, pass empty string to `callback("")`.
---  • Returns the **window id** so the caller may inspect/close it if needed.
---
---  Non-blocking: execution continues immediately after the call; the user
---  input is delivered solely via the callback.
----------------------------------------------------------------------------
-
 local popup = require("plenary.popup")
 
 function P.show_popup(label, cb)
@@ -202,8 +161,6 @@ function P.show_popup(label, cb)
 
 	local width = math.floor(vim.o.columns * 0.60)
 	local height = 5
-
-	-- ① create popup → win_id
 	local win = popup.create({ "" }, {
 		title = label,
 		enter = true,
@@ -212,12 +169,10 @@ function P.show_popup(label, cb)
 		minheight = height,
 		minwidth = width,
 		borderchars = { "─", "│", "─", "│", "╭", "╮", "╯", "╰" },
-	}) -- win is **window id**
+	})
 
-	-- ② grab the (scratch) buffer that plenary just made
 	local buf = vim.api.nvim_win_get_buf(win)
 
-	-- ③ prompt-style: <CR> submits, <Esc><Esc> cancels
 	vim.bo[buf].buftype = "prompt"
 	vim.fn.prompt_setprompt(buf, "› ")
 	vim.fn.prompt_setcallback(buf, function(text)
