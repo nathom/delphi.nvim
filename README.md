@@ -1,5 +1,5 @@
 # delphi.nvim
 
-A high taste LLM plugin.
+A tasteful LLM plugin.
 
 WIP.
