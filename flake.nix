@@ -1,5 +1,5 @@
 {
-  description = "Dev + test env for myllm.nvim";
+  description = "Dev env for delphi.nvim";
 
   inputs = {
     nixpkgs.url      = "github:NixOS/nixpkgs/nixos-unstable";
@@ -24,7 +24,7 @@
           export NVIM_TEST_HOME=$(mktemp -d)
 
           # expose paths to Lua
-          export MYLLM_PATH=$PWD
+          export DELPHI_PATH=$PWD
           export PLENARY_PATH=${pkgs.vimPlugins.plenary-nvim}
 
           cat > "$NVIM_TEST_HOME/init.lua" <<'LUA'
@@ -42,7 +42,7 @@
 
             -- install test-time plugins -----------------------------------------
             require("lazy").setup({
-              { dir = os.getenv("MYLLM_PATH"),  name = "myllm.nvim",
+              { dir = os.getenv("DELPHI_PATH"),  name = "delphi.nvim",
                 dependencies = { "nvim-lua/plenary.nvim" } },
               "nvim-lua/plenary.nvim",
             })

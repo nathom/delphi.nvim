@@ -31,7 +31,7 @@ function P.foldexpr(lnum)
 	end
 	return "=" -- inside a turn
 end
-_G.myllm_foldexpr = P.foldexpr
+_G.delphi_foldexpr = P.foldexpr
 
 -- improved block parser ------------------------------------------------------
 ---@param input string
@@ -120,7 +120,7 @@ function P.open_new_chat_buffer(system_prompt)
 	vim.bo.buftype, vim.bo.bufhidden, vim.bo.filetype = "nofile", "hide", "markdown"
 	-- ▼ folding: one call, one liner ▼
 	-- vim.wo.foldmethod = "expr"
-	-- vim.wo.foldexpr = "v:lua.myllm_foldexpr(v:lnum)"
+	-- vim.wo.foldexpr = "v:lua.delphi_foldexpr(v:lnum)"
 
 	local lines = {
 		"System:",
@@ -193,10 +193,10 @@ function P.show_popup(label, cb)
 	return win
 end
 
-local diff_ns = vim.api.nvim_create_namespace("myllm_inline_diff")
+local diff_ns = vim.api.nvim_create_namespace("delphi_inline_diff")
 
 function P.start_inline_diff(buf, start_lnum, end_lnum, left_lines)
-	local Differ = require("llm-nvim.unidiff").Differ
+	local Differ = require("delphi.unidiff").Differ
 	local d = Differ.new(left_lines)
 	local orig = vim.deepcopy(left_lines) -- for reject()
 	local cur_end = end_lnum

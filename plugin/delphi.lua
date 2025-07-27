@@ -1,13 +1,5 @@
--- plugin/myllm.lua -----------------------------------------------------------
--- Streaming chat with turn-level folding + full multi-turn context.
--- Setup:
---   require('myllm').setup{ fold=true, system_prompt='You are terse.' }
--- Commands:
---   :Chat   – open / continue chat (maintains full history)
---   :LLM    – quick one-shot demo
-
-local openai = require("llm-nvim.openai")
-local P = require("llm-nvim.primitives")
+local openai = require("delphi.openai")
+local P = require("delphi.primitives")
 local M = { opts = { fold = true, system_prompt = nil } }
 
 function M.setup(opts)
@@ -15,36 +7,24 @@ function M.setup(opts)
 end
 
 vim.api.nvim_create_user_command("Chat", function(opts)
-	------------------------------------------------------------
-	-- 1. Ensure we’re in a chat buffer, or create one
-	------------------------------------------------------------
 	local buf = vim.api.nvim_get_current_buf()
-	if not vim.b.is_myllm_chat then -- flag optional
+	if not vim.b.is_delphi_chat then -- flag optional
 		buf = P.open_new_chat_buffer(opts.args) -- opts.args → system prompt
-		vim.b.is_myllm_chat = true
+		vim.b.is_delphi_chat = true
 		return -- first call just opens buffer
 	end
 
-	------------------------------------------------------------
-	-- 2. Grab full conversation and the latest user prompt
-	------------------------------------------------------------
 	local transcript = P.read_buf(buf)
 	local messages = P.to_messages(transcript)
 	local last_role = (#messages > 0) and messages[#messages].role or ""
 	if last_role ~= "user" then -- nothing new to send
 		return vim.notify("The last message must be from the User!")
 	end
-	--
-	-- ------------------------------------------------------------
-	-- -- 3. Append Assistant header + blank line
-	-- ------------------------------------------------------------
+
 	P.append_line_to_buf(buf, "") -- spacer
 	P.append_line_to_buf(buf, "Assistant:")
 	P.append_line_to_buf(buf, "") -- where streaming will go
-	--
-	-- ------------------------------------------------------------
-	-- -- 4. Call OpenAI; stream tokens into the last line
-	-- ------------------------------------------------------------
+
 	openai.setup({ api_key = os.getenv("OPENAI_API_KEY") })
 	openai.chat({
 		model = "gpt-4o", -- or gemini-flash-lite
@@ -68,33 +48,7 @@ vim.api.nvim_create_user_command("Chat", function(opts)
 	})
 end, { nargs = "?" }) -- optional s
 
-local function after_fence(s)
-	local _, finish = s:find("```")
-	if finish then
-		return s:sub(finish + 1)
-	else
-		return ""
-	end
-end
-local function before_fence(s)
-	local start_pos = s:find("\n```")
-	if start_pos then
-		if start_pos > 1 then
-			return s:sub(1, start_pos - 1)
-		else
-			return ""
-		end
-	else
-		return s
-	end
-end
--------------------------------------------------------------------------------
--- :Refactor  –  LLM-powered in-place rewrite of a visual selection
--------------------------------------------------------------------------------
 vim.api.nvim_create_user_command("Refactor", function()
-	---------------------------------------------------------------------------
-	-- 1 · gather context (buffer + visual selection)
-	---------------------------------------------------------------------------
 	local orig_buf = vim.api.nvim_get_current_buf()
 	local sel = P.get_visual_selection(orig_buf)
 	if #sel.lines == 0 then
@@ -102,9 +56,6 @@ vim.api.nvim_create_user_command("Refactor", function()
 	end
 	local file_lines = vim.api.nvim_buf_get_lines(orig_buf, 0, -1, false)
 
-	---------------------------------------------------------------------------
-	-- 2 · ask user for the rewrite instruction
-	---------------------------------------------------------------------------
 	P.show_popup("Refactor prompt", function(user_prompt)
 		vim.notify(user_prompt)
 		if user_prompt == "" then
@@ -112,9 +63,6 @@ vim.api.nvim_create_user_command("Refactor", function()
 			return
 		end -- cancelled
 
-		-----------------------------------------------------------------------
-		-- 4 · call LLM
-		-----------------------------------------------------------------------
 		openai.setup({ api_key = os.getenv("OPENAI_API_KEY") })
 		local system_msg = "You are an expert refactoring assistant. "
 			.. "Return ONLY the rewritten code wrapped in one fenced block: ```\n…\n```."
@@ -135,17 +83,10 @@ vim.api.nvim_create_user_command("Refactor", function()
 		}, "\n")
 
 		-- simple fence-aware streaming state
-		local Extractor = require("llm-nvim.extractor").Extractor
+		local Extractor = require("delphi.extractor").Extractor
 		local extractor = Extractor.new()
 
-		-- local differ = require("llm-nvim.unidiff").Differ.new(sel.lines)
 		local diff = P.start_inline_diff(orig_buf, sel.start_lnum, sel.end_lnum, sel.lines)
-		local in_code = false
-
-		local full_response = ""
-		local fence_idx
-		local response = ""
-		local done = false
 		openai.chat({
 			model = "gpt-4o",
 			stream = true,
@@ -158,10 +99,8 @@ vim.api.nvim_create_user_command("Refactor", function()
 				local delta = chunk.choices[1].delta.content or ""
 				local new_code = extractor:update(delta)
 				if #new_code then
-					-- differ:update(new_code)
 					diff.push(new_code)
 				end
-				-- vim.notify(vim.inspect(differ:lines()))
 			end),
 
 			on_done = function()
