@@ -47,6 +47,7 @@
                 dependencies = { "nvim-lua/plenary.nvim" },
                 opts = {
                   chat = { system_prompt = "You are a helpful assistant.", default_model = "gpt_4o" },
+                  refactor = { default_model = "gpt_4o" },
                   models = {
                     gpt_4o = {
                       base_url = "", -- SET THIS UP

@@ -36,6 +36,18 @@ Instruction: {{user_instructions}}]],
 }
 local M = { opts = default_opts }
 
+local function get_delta(chunk)
+	if not chunk or not chunk.choices then
+		return ""
+	end
+	local delta = ""
+	local choice = chunk.choices[1]
+	if choice then
+		delta = choice.delta.content
+	end
+	return delta or ""
+end
+
 local function setup_chat_cmd(config)
 	vim.api.nvim_create_user_command("Chat", function()
 		local buf = vim.api.nvim_get_current_buf()
@@ -73,12 +85,7 @@ local function setup_chat_cmd(config)
 					P.set_cursor_to_user(buf)
 					return
 				end
-				local delta = ""
-				local choice = chunk.choices[1]
-				if choice then
-					delta = choice.delta.content
-				end
-				P.append_chunk_to_buf(buf, delta)
+				P.append_chunk_to_buf(buf, get_delta(chunk))
 			end),
 
 			on_done = function()
@@ -125,7 +132,7 @@ local function setup_refactor_cmd(config)
 			local diff = P.start_inline_diff(orig_buf, sel.start_lnum, sel.end_lnum, sel.lines)
 			local model = M.opts.models[config.default_model]
 			if not model then
-				vim.notify("Coudln't find model " .. config.default_model, vim.log.levels.ERROR)
+				vim.notify("Coudln't find model " .. tostring(config.default_model), vim.log.levels.ERROR)
 				return
 			end
 
@@ -136,33 +143,34 @@ local function setup_refactor_cmd(config)
 					{ role = "user", content = P.template(M.opts.refactor.prompt_template, env) },
 				},
 			}, {
-				on_chunk = vim.schedule_wrap(function(chunk)
-					local delta = chunk.choices[1].delta.content or ""
-					local new_code = extractor:update(delta)
+				on_chunk = vim.schedule_wrap(function(chunk, is_done)
+					if is_done then
+						local map = vim.keymap.set
+						map("n", config.accept_keymap, function()
+							diff.accept()
+							vim.notify("applied")
+						end, { buffer = orig_buf })
+						map("n", config.reject_keymap, function()
+							diff.reject()
+							vim.notify("rejected")
+						end, { buffer = orig_buf })
+						vim.notify(
+							"Refactor finished – "
+								.. config.accept_keymap
+								.. " accept "
+								.. config.reject_keymap
+								.. " reject",
+							vim.log.levels.INFO
+						)
+						return
+					end
+					local new_code = extractor:update(get_delta(chunk))
 					if #new_code then
 						diff.push(new_code)
 					end
 				end),
 
-				on_done = function()
-					local map = vim.keymap.set
-					map("n", config.accept_keymap, function()
-						diff.accept()
-						vim.notify("applied")
-					end, { buffer = orig_buf })
-					map("n", config.reject_keymap, function()
-						diff.reject()
-						vim.notify("rejected")
-					end, { buffer = orig_buf })
-					vim.notify(
-						"Refactor finished – "
-							.. config.accept_keymap
-							.. " accept "
-							.. config.reject_keymap
-							.. " reject",
-						vim.log.levels.INFO
-					)
-				end,
+				on_done = function() end,
 				on_error = function(err_output)
 					print("called on error")
 				end,
