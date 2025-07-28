@@ -28,7 +28,6 @@
           export PLENARY_PATH=${pkgs.vimPlugins.plenary-nvim}
 
           cat > "$NVIM_TEST_HOME/init.lua" <<'LUA'
-            -- bootstrap lazy.nvim ------------------------------------------------
             local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
             if not vim.loop.fs_stat(lazypath) then
               vim.fn.system({
@@ -40,11 +39,23 @@
             end
             vim.opt.rtp:prepend(lazypath)
 
-            -- install test-time plugins -----------------------------------------
+            vim.g.mapleader = ' '
             require("lazy").setup({
-              { dir = os.getenv("DELPHI_PATH"),  name = "delphi.nvim",
-                dependencies = { "nvim-lua/plenary.nvim" } },
-              "nvim-lua/plenary.nvim",
+              {
+                dir = os.getenv("DELPHI_PATH"),
+                name = "delphi.nvim",
+                dependencies = { "nvim-lua/plenary.nvim" },
+                opts = {
+                  chat = { system_prompt = "You are a helpful assistant.", default_model = "gpt_4o" },
+                  models = {
+                    gpt_4o = {
+                      base_url = "", -- SET THIS UP
+                      api_key_env_var = "", -- SET THIS UP
+                      model_name = "gpt-4o",
+                    }
+                  }
+                },
+              }
             })
           LUA
 

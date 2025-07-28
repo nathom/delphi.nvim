@@ -1,5 +1,22 @@
 local P = {}
 
+---Fill in a template string
+---@param str string
+---@param env table
+---@return string
+function P.template(str, env)
+	return (
+		str:gsub("{{(.-)}}", function(key)
+			if env[key] then
+				return env[key]
+			else
+				vim.notify("delphi.nvim: invalid variable '" .. key .. "' in template string", vim.log.levels.WARN)
+				return "{{" .. key .. "}}"
+			end
+		end)
+	)
+end
+
 local function starts_with(str, prefix)
 	return str:sub(1, #prefix) == prefix
 end
@@ -71,6 +88,9 @@ function P.append_line_to_buf(buf, line)
 end
 
 function P.append_chunk_to_buf(buf, chunk)
+	if not chunk then
+		return
+	end
 	buf = buf or 0
 	if not vim.api.nvim_buf_is_valid(buf) then
 		error(("append_chunk_to_buf: invalid buffer %s"):format(tostring(buf)))

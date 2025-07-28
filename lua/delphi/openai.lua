@@ -15,49 +15,25 @@
 
 local M = {}
 
-local cfg = {
-	base_url = "https://openrouter.ai/api/v1",
-	api_key = nil,
-	organization = nil,
-	timeout = 30000, -- ms before vim.system kills curl
-}
-
---- Configure the module (call once from plugin setup)
----@param opts table
-function M.setup(opts)
-	opts = opts or {}
-	for k, v in pairs(opts) do
-		cfg[k] = v or cfg[k]
-	end
-end
-
 --- Internal: build curl header list
-local function build_headers()
+---@param api_key string
+local function build_headers(api_key)
 	local hdr = {
 		"-H",
 		"Content-Type: application/json",
 		"-H",
-		"Authorization: Bearer " .. (cfg.api_key or ""),
+		"Authorization: Bearer " .. (api_key or ""),
 	}
-	if cfg.organization then
-		table.insert(hdr, "-H")
-		table.insert(hdr, "OpenAI-Organization: " .. cfg.organization)
-	end
 	return hdr
 end
 
 --- Send a chat completion request.
----@param body table   -- full JSON payload per OpenAI docs
----@param cb   table   -- {on_chunk, on_complete, on_done, on_error}
----@return vim.SystemObj?    -- vim.system handle (for cancellation)
-function M.chat(body, cb)
-	cb = cb or {}
-	if not cfg.api_key or cfg.api_key == "" then
-		local msg = "[openai.lua] Missing API key (setup{api_key=} or $OPENAI_API_KEY)";
-		(cb.on_error or vim.notify)(msg, vim.log.levels.ERROR)
-		return nil
-	end
-
+---@param model Model
+---@param body table
+---@param cb   {on_chunk: function, on_complete: function, on_done: function, on_error: function}
+---@return vim.SystemObj?
+function M.chat(model, body, cb)
+	body.model = model.model_name
 	local payload = vim.json.encode(body)
 
 	local cmd = {
@@ -66,9 +42,9 @@ function M.chat(body, cb)
 		"--no-buffer",
 		"-X",
 		"POST",
-		cfg.base_url .. "/chat/completions",
+		model.base_url .. "/chat/completions",
 	}
-	vim.list_extend(cmd, build_headers())
+	vim.list_extend(cmd, build_headers(model:get_api_key()))
 	table.insert(cmd, "-d")
 	table.insert(cmd, payload)
 
@@ -86,7 +62,9 @@ function M.chat(body, cb)
 			local chunk = vim.trim(line:sub(6))
 			if chunk == "[DONE]" then
 				if cb.on_done then
-					vim.schedule(cb.on_done)
+					vim.schedule(function()
+						cb.on_chunk(nil, true)
+					end)
 				end
 			else
 				local ok, decoded = pcall(vim.json.decode, chunk, {
@@ -134,7 +112,6 @@ function M.chat(body, cb)
 	local handle
 	handle = vim.system(cmd, {
 		text = true,
-		timeout = cfg.timeout,
 		stdout = function(_, data)
 			if body.stream then
 				handle_stream(data)
