@@ -45,7 +45,16 @@
                 dir = os.getenv("DELPHI_PATH"),
                 name = "delphi.nvim",
                 dependencies = { "nvim-lua/plenary.nvim" },
-                opts = { chat = { system_prompt = "HELOO"} }
+                opts = {
+                  chat = { system_prompt = "You are a helpful assistant.", default_model = "gpt_4o" },
+                  models = {
+                    gpt_4o = {
+                      base_url = "", -- SET THIS UP
+                      api_key_env_var = "", -- SET THIS UP
+                      model_name = "gpt-4o",
+                    }
+                  }
+                },
               }
             })
           LUA

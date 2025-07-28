@@ -88,6 +88,9 @@ function P.append_line_to_buf(buf, line)
 end
 
 function P.append_chunk_to_buf(buf, chunk)
+	if not chunk then
+		return
+	end
 	buf = buf or 0
 	if not vim.api.nvim_buf_is_valid(buf) then
 		error(("append_chunk_to_buf: invalid buffer %s"):format(tostring(buf)))

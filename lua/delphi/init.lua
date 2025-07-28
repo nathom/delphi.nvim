@@ -1,11 +1,18 @@
 local openai = require("delphi.openai")
 local P = require("delphi.primitives")
 
+---@class Config
+---@field models table<string, Model>
+---@field chat { system_prompt: string, default_model: string? }
+---@field refactor { system_prompt: string, default_model: string?, prompt_template: string, accept_keymap: string, reject_keymap: string }
 local default_opts = {
+	models = {},
 	chat = {
 		system_prompt = "",
+		default_model = nil,
 	},
 	refactor = {
+		default_model = nil,
 		system_prompt = [[
 You are an expert refactoring assistant. Return ONLY the rewritten code in one fenced block:
 ```
@@ -49,22 +56,37 @@ local function setup_chat_cmd(config)
 		P.append_line_to_buf(buf, "Assistant:")
 		P.append_line_to_buf(buf, "")
 
-		openai.setup({ api_key = os.getenv("OPENAI_API_KEY") })
-		openai.chat({
-			model = "gpt-4o",
+		local model = M.opts.models[config.default_model]
+		if model == nil then
+			vim.notify("Coudln't find model " .. config.default_model, vim.log.levels.ERROR)
+			return
+		end
+		openai.chat(model, {
 			stream = true,
 			messages = messages,
 		}, {
-			on_chunk = vim.schedule_wrap(function(chunk)
-				local delta = chunk.choices[1].delta.content or ""
+			on_chunk = vim.schedule_wrap(function(chunk, is_done)
+				if is_done then
+					P.append_line_to_buf(buf, "")
+					P.append_line_to_buf(buf, "User: ")
+					P.append_line_to_buf(buf, "")
+					P.set_cursor_to_user(buf)
+					return
+				end
+				local delta = ""
+				local choice = chunk.choices[1]
+				if choice then
+					delta = choice.delta.content
+				end
 				P.append_chunk_to_buf(buf, delta)
 			end),
 
 			on_done = function()
-				P.append_line_to_buf(buf, "")
-				P.append_line_to_buf(buf, "User: ")
-				P.append_line_to_buf(buf, "")
-				P.set_cursor_to_user(buf)
+				-- vim.notify(debug.traceback("msg", 5))
+				-- P.append_line_to_buf(buf, "")
+				-- P.append_line_to_buf(buf, "User: ")
+				-- P.append_line_to_buf(buf, "")
+				-- P.set_cursor_to_user(buf)
 			end,
 
 			on_error = vim.notify,
@@ -88,8 +110,6 @@ local function setup_refactor_cmd(config)
 				return
 			end -- cancelled
 
-			openai.setup({ api_key = os.getenv("OPENAI_API_KEY") })
-
 			local env = {
 				file_text = table.concat(file_lines, "\n"),
 				selected_text = table.concat(sel.lines, "\n"),
@@ -103,8 +123,13 @@ local function setup_refactor_cmd(config)
 			local extractor = Extractor.new()
 
 			local diff = P.start_inline_diff(orig_buf, sel.start_lnum, sel.end_lnum, sel.lines)
-			openai.chat({
-				model = "gpt-4o",
+			local model = M.opts.models[config.default_model]
+			if not model then
+				vim.notify("Coudln't find model " .. config.default_model, vim.log.levels.ERROR)
+				return
+			end
+
+			openai.chat(model, {
 				stream = true,
 				messages = {
 					{ role = "system", content = M.opts.refactor.system_prompt },
@@ -138,13 +163,22 @@ local function setup_refactor_cmd(config)
 						vim.log.levels.INFO
 					)
 				end,
-				on_error = vim.notify,
+				on_error = function(err_output)
+					print("called on error")
+				end,
 			})
 		end)
 	end, { range = true, desc = "LLM-rewrite the current visual selection" })
 end
 
+---Setup delphi
+---@param opts Config
 function M.setup(opts)
+	local models = opts.models
+	local Model = require("delphi.model").Model
+	for k, v in pairs(models) do
+		models[k] = Model.new(v)
+	end
 	M.opts = vim.tbl_deep_extend("force", M.opts, opts or {})
 	setup_chat_cmd(M.opts.chat)
 	setup_refactor_cmd(M.opts.refactor)
