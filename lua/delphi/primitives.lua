@@ -1,5 +1,22 @@
 local P = {}
 
+---Fill in a template string
+---@param str string
+---@param env table
+---@return string
+function P.template(str, env)
+	return (
+		str:gsub("{{(.-)}}", function(key)
+			if env[key] then
+				return env[key]
+			else
+				vim.notify("delphi.nvim: invalid variable '" .. key .. "' in template string", vim.log.levels.WARN)
+				return "{{" .. key .. "}}"
+			end
+		end)
+	)
+end
+
 local function starts_with(str, prefix)
 	return str:sub(1, #prefix) == prefix
 end
