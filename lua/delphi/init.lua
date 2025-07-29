@@ -9,10 +9,11 @@ local P = require("delphi.primitives")
 local default_opts = {
 	models = {},
 	allow_env_var_config = false,
-	chat = {
-		system_prompt = "",
-		default_model = nil,
-	},
+       chat = {
+               system_prompt = "",
+               default_model = nil,
+               enable_cmp = false,
+       },
 	refactor = {
 		default_model = nil,
 		system_prompt = [[
@@ -52,15 +53,18 @@ end
 
 local function setup_chat_cmd(config)
 	vim.api.nvim_create_user_command("Chat", function()
-		local buf = vim.api.nvim_get_current_buf()
-		if not vim.b.is_delphi_chat then
-			buf = P.open_new_chat_buffer(config.system_prompt)
-			vim.b.is_delphi_chat = true
-			return
-		end
+               local buf = vim.api.nvim_get_current_buf()
+               if not vim.b.is_delphi_chat then
+                       buf = P.open_new_chat_buffer(config.system_prompt, { enable_cmp = config.enable_cmp })
+                       vim.b.is_delphi_chat = true
+                       return
+               end
 
-		local transcript = P.read_buf(buf)
-		local messages = P.to_messages(transcript)
+               local transcript = P.read_buf(buf)
+               local messages = P.to_messages(transcript)
+               for _, m in ipairs(messages) do
+                       m.content = P.expand_file_tags(m.content)
+               end
 		local last_role = (#messages > 0) and messages[#messages].role or ""
 		if last_role ~= "user" then -- nothing new to send
 			return vim.notify("The last message must be from the User!")

@@ -130,12 +130,33 @@ end
 ---@param buf integer
 ---@return string
 function P.read_buf(buf)
-	return table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), "\n")
+        return table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), "\n")
 end
 
-function P.open_new_chat_buffer(system_prompt)
-	vim.cmd("enew") -- new buffer, same window
-	local buf = vim.api.nvim_get_current_buf()
+---Expand @file tags within a string to inline code blocks with file contents
+---@param input string
+---@return string
+function P.expand_file_tags(input)
+       return (
+               input:gsub("@(%S+)", function(path)
+                       local cleaned = path:gsub([[%p$]], "")
+                       local expanded = vim.fn.expand(cleaned)
+                       if vim.fn.filereadable(expanded) == 0 then
+                               return "@" .. path
+                       end
+                       local ok, lines = pcall(vim.fn.readfile, expanded)
+                       if not ok then
+                               return "@" .. path
+                       end
+                       return string.format("```%s\n%s\n```", cleaned, table.concat(lines, "\n"))
+               end)
+       )
+end
+
+function P.open_new_chat_buffer(system_prompt, opts)
+       opts = opts or {}
+       vim.cmd("enew") -- new buffer, same window
+       local buf = vim.api.nvim_get_current_buf()
 
 	vim.bo.buftype, vim.bo.bufhidden, vim.bo.filetype = "nofile", "hide", "markdown"
 	-- ▼ folding: one call, one liner ▼
@@ -151,9 +172,17 @@ function P.open_new_chat_buffer(system_prompt)
 	}
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
 
-	P.set_cursor_to_user(buf) -- jump to User prompt
-	vim.cmd("startinsert")
-	return buf
+       P.set_cursor_to_user(buf) -- jump to User prompt
+
+       if opts.enable_cmp then
+               local ok, cmp = pcall(require, "cmp")
+               if ok then
+                       cmp.setup.buffer({ sources = { { name = "path" } } })
+               end
+       end
+
+       vim.cmd("startinsert")
+       return buf
 end
 
 ---Return current visual selection (or current line if none).
