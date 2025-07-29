@@ -216,8 +216,9 @@ end
 local diff_ns = vim.api.nvim_create_namespace("delphi_inline_diff")
 
 function P.start_inline_diff(buf, start_lnum, end_lnum, left_lines)
-	local Differ = require("delphi.unidiff").Differ
-	local d = Differ.new(left_lines)
+	local Differ = require("delphi.difflib").Differ
+	local d = Differ:new()
+	local right_text = ""
 	local orig = vim.deepcopy(left_lines) -- for reject()
 	local cur_end = end_lnum
 
@@ -242,11 +243,11 @@ function P.start_inline_diff(buf, start_lnum, end_lnum, left_lines)
 		cur_end = start_lnum + #lines - 1
 	end
 
-	render(d:lines()) -- initial identical diff
-
 	return {
 		push = function(tok)
-			render(d:update(tok))
+			right_text = right_text .. tok
+			local right_lines = vim.split(right_text, "\n", { plain = true, trimempty = false })
+			render(d:compare(left_lines, right_lines))
 		end,
 		accept = function()
 			vim.api.nvim_buf_set_lines(
@@ -254,7 +255,7 @@ function P.start_inline_diff(buf, start_lnum, end_lnum, left_lines)
 				start_lnum - 1,
 				cur_end,
 				false,
-				vim.split(d.right_text, "\n", { plain = true, trimempty = false })
+				vim.split(right_text, "\n", { plain = true, trimempty = false })
 			)
 			vim.api.nvim_buf_clear_namespace(buf, diff_ns, start_lnum - 1, cur_end)
 		end,

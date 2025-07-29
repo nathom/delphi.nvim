@@ -15,10 +15,16 @@
     {
       devShells.default = pkgs.mkShell {
         packages = with pkgs; [
-          (neovim.override { configure = { }; })  # vanilla NVim
-          vimPlugins.plenary-nvim                # plenary as a nix pkg
-          git curl jq ripgrep lua-language-server stylua
+          (neovim.override { configure = { }; })
+          vimPlugins.plenary-nvim
+          git
+          curl
+          jq
+          ripgrep
+          lua-language-server
+          stylua
         ];
+
 
         shellHook = ''
           export NVIM_TEST_HOME=$(mktemp -d)
@@ -46,13 +52,13 @@
                 name = "delphi.nvim",
                 dependencies = { "nvim-lua/plenary.nvim" },
                 opts = {
-                  chat = { system_prompt = "You are a helpful assistant.", default_model = "gpt_4o" },
-                  refactor = { default_model = "gpt_4o" },
+                  chat = { system_prompt = "You are a helpful assistant.", default_model = "gemini_flash" },
+                  refactor = { default_model = "gemini_flash" },
                   models = {
-                    gpt_4o = {
-                      base_url = "", -- SET THIS UP
-                      api_key_env_var = "", -- SET THIS UP
-                      model_name = "gpt-4o",
+                    gemini_flash = {
+                      base_url = "https://openrouter.ai/api/v1", -- SET THIS UP
+                      api_key_env_var = "OPENROUTER_API_KEY", -- SET THIS UP
+                      model_name = "google/gemini-2.5-flash",
                     }
                   }
                 },
