@@ -216,7 +216,7 @@ end
 local diff_ns = vim.api.nvim_create_namespace("delphi_inline_diff")
 
 function P.start_inline_diff(buf, start_lnum, end_lnum, left_lines)
-	local Differ = require("delphi.difflib").Differ
+	local Differ = require("delphi.patience").Differ
 	local d = Differ:new()
 	local right_text = ""
 	local orig = vim.deepcopy(left_lines) -- for reject()
