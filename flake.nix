@@ -45,14 +45,14 @@
             end
             vim.opt.rtp:prepend(lazypath)
 
-            vim.g.mapleader = ' '
+            vim.g.mapleader = " "
             require("lazy").setup({
               {
                 dir = os.getenv("DELPHI_PATH"),
                 name = "delphi.nvim",
                 dependencies = { "nvim-lua/plenary.nvim" },
                 opts = {
-		  allow_env_var_config = true,
+                  allow_env_var_config = true,
                   chat = { default_model = "gemini_flash" },
                   refactor = { default_model = "gemini_flash" },
                   models = {
