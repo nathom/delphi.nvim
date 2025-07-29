@@ -3,10 +3,12 @@ local P = require("delphi.primitives")
 
 ---@class Config
 ---@field models table<string, Model>
+---@field allow_env_var_config boolean
 ---@field chat { system_prompt: string, default_model: string? }
 ---@field refactor { system_prompt: string, default_model: string?, prompt_template: string, accept_keymap: string, reject_keymap: string }
 local default_opts = {
 	models = {},
+	allow_env_var_config = false,
 	chat = {
 		system_prompt = "",
 		default_model = nil,
@@ -29,7 +31,7 @@ Selected lines ({{selection_start_lnum}}:{{selection_end_lnum}}):
 {{selected_text}}
 ```
 
-Instruction: {{user_instructions}}]],
+Instruction: {{user_instructions}}. Return ONLY the refactored code within a code block. Preserve formatting unless told otherwise. Try to keep the diff minimal while following the instructions exactly.]],
 		accept_keymap = "<leader>a",
 		reject_keymap = "<leader>r",
 	},
@@ -68,9 +70,15 @@ local function setup_chat_cmd(config)
 		P.append_line_to_buf(buf, "Assistant:")
 		P.append_line_to_buf(buf, "")
 
-		local model = M.opts.models[config.default_model]
+		local default_model
+		if M.opts.allow_env_var_config and os.getenv("DELPHI_DEFAULT_CHAT_MODEL") then
+			default_model = os.getenv("DELPHI_DEFAULT_CHAT_MODEL")
+		else
+			default_model = config.default_model
+		end
+		local model = M.opts.models[default_model]
 		if model == nil then
-			vim.notify("Coudln't find model " .. config.default_model, vim.log.levels.ERROR)
+			vim.notify("Coudln't find model " .. tostring(default_model), vim.log.levels.ERROR)
 			return
 		end
 		openai.chat(model, {
@@ -130,9 +138,15 @@ local function setup_refactor_cmd(config)
 			local extractor = Extractor.new()
 
 			local diff = P.start_inline_diff(orig_buf, sel.start_lnum, sel.end_lnum, sel.lines)
-			local model = M.opts.models[config.default_model]
+			local default_model
+			if M.opts.allow_env_var_config and os.getenv("DELPHI_DEFAULT_REFACTOR_MODEL") then
+				default_model = os.getenv("DELPHI_DEFAULT_REFACTOR_MODEL")
+			else
+				default_model = config.default_model
+			end
+			local model = M.opts.models[default_model]
 			if not model then
-				vim.notify("Coudln't find model " .. tostring(config.default_model), vim.log.levels.ERROR)
+				vim.notify("Coudln't find model " .. tostring(default_model), vim.log.levels.ERROR)
 				return
 			end
 

@@ -52,7 +52,8 @@
                 name = "delphi.nvim",
                 dependencies = { "nvim-lua/plenary.nvim" },
                 opts = {
-                  chat = { system_prompt = "You are a helpful assistant.", default_model = "gemini_flash" },
+		  allow_env_var_config = true,
+                  chat = { default_model = "gemini_flash" },
                   refactor = { default_model = "gemini_flash" },
                   models = {
                     gemini_flash = {
