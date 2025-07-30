@@ -27,14 +27,10 @@ You are an expert refactoring assistant. Return ONLY the rewritten code in one f
 ```.]],
 		prompt_template = [[
 Full file for context:
-```
-{{file_text}}
-```
+{{file_block}}
 
 Selected lines ({{selection_start_lnum}}:{{selection_end_lnum}}):
-```
-{{selected_text}}
-```
+{{selected_block}}
 
 Instruction: {{user_instructions}}. Return ONLY the refactored code within a code block. Preserve formatting unless told otherwise. Try to keep the diff minimal while following the instructions exactly.]],
 		accept_keymap = "<leader>a",
@@ -168,6 +164,8 @@ local function setup_refactor_cmd(config)
 				selection_end_lnum = sel.end_lnum,
 				user_instructions = user_prompt,
 			}
+			env.file_block = P.fenced_block(env.file_text)
+			env.selected_block = P.fenced_block(env.selected_text)
 
 			-- simple fence-aware streaming state
 			local Extractor = require("delphi.extractor").Extractor
