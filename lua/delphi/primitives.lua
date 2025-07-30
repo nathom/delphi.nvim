@@ -235,7 +235,7 @@ function P.save_chat(buf, path)
 end
 
 ---List available chats
----@return table[] -- { path=string, preview=string }
+---@return { path:string, preview:string }[]
 function P.list_chats()
 	local dir = P.chat_data_dir()
 	print("dir", dir)
