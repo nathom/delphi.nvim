@@ -8,10 +8,7 @@ local Model = {}
 Model.__index = Model
 
 -- Constructor for the Model class
----@param base_url string
----@param api_key_env_var string
----@param model_name string
----@param temperature number
+---@param opts { base_url: string, api_key_env_var: string, model_name: string, temperature: number }
 ---@return Model
 function Model.new(opts)
 	local instance = setmetatable({}, Model)

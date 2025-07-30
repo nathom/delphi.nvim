@@ -9,15 +9,15 @@ local P = require("delphi.primitives")
 local default_opts = {
 	models = {},
 	allow_env_var_config = false,
-        chat = {
-                system_prompt = "",
-                default_model = nil,
-                headers = {
-                        system = "System:",
-                        user = "User:",
-                        assistant = "Assistant:",
-                },
-        },
+	chat = {
+		system_prompt = "",
+		default_model = nil,
+		headers = {
+			system = "System:",
+			user = "User:",
+			assistant = "Assistant:",
+		},
+	},
 	refactor = {
 		default_model = nil,
 		system_prompt = [[
@@ -144,9 +144,9 @@ local function setup_chat_cmd(config)
                 end
                 P.write_chat_meta(vim.b.delphi_chat_path, meta)
 
-                P.append_line_to_buf(buf, "")
-                P.append_line_to_buf(buf, P.headers.assistant)
-                P.append_line_to_buf(buf, "")
+		P.append_line_to_buf(buf, "")
+		P.append_line_to_buf(buf, P.headers.assistant)
+		P.append_line_to_buf(buf, "")
 
 		local default_model
 		if M.opts.allow_env_var_config and os.getenv("DELPHI_DEFAULT_CHAT_MODEL") then
@@ -165,9 +165,9 @@ local function setup_chat_cmd(config)
 		}, {
 			on_chunk = vim.schedule_wrap(function(chunk, is_done)
 				if is_done then
-                                        P.append_line_to_buf(buf, "")
-                                        P.append_line_to_buf(buf, P.headers.user .. " ")
-                                        P.append_line_to_buf(buf, "")
+					P.append_line_to_buf(buf, "")
+					P.append_line_to_buf(buf, P.headers.user .. " ")
+					P.append_line_to_buf(buf, "")
 					P.set_cursor_to_user(buf)
 					P.save_chat(buf)
 					return
@@ -255,9 +255,7 @@ local function setup_refactor_cmd(config)
 					end
 				end),
 
-				on_error = function(err_output)
-					print("called on error")
-				end,
+				on_error = function() end,
 			})
 		end)
 	end, { range = true, desc = "LLM-rewrite the current visual selection" })
@@ -271,6 +269,7 @@ function M.setup(opts)
 	for k, v in pairs(models) do
 		models[k] = Model.new(v)
 	end
+
         M.opts = vim.tbl_deep_extend("force", M.opts, opts or {})
        P.set_headers(M.opts.chat.headers)
        setup_chat_cmd(M.opts.chat)
@@ -280,6 +279,7 @@ function M.setup(opts)
         if ok then
                 cmp.register_source('delphi_path', require('delphi.cmp_source'))
         end
+
 end
 
 return M

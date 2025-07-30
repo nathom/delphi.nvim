@@ -377,15 +377,15 @@ end
 
 --- Compare two sequences of lines and return diff in difflib format
 ---@param a string[] The "before" sequence of lines
----@param b string[] The "after" sequence of lines  
+---@param b string[] The "after" sequence of lines
 ---@return string[] Array of diff lines with prefixes: "- ", "+ ", "  "
 function Differ:compare(a, b)
 	local differ = PatienceDiff:new(a, b)
 	local removed, added = differ:diff()
-	
+
 	local result = {}
 	local i, j = 1, 1
-	
+
 	while i <= #a or j <= #b do
 		if i <= #a and removed[i] then
 			-- Line removed from a
@@ -404,7 +404,7 @@ function Differ:compare(a, b)
 			j = j + 1
 		end
 	end
-	
+
 	return result
 end
 
