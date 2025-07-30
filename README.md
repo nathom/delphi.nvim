@@ -59,6 +59,3 @@ Instruction: {{user_instructions}}. Return ONLY the refactored code within a cod
 	},
 }
 ```
-
-## File tagging
-Delphi supports using `@path/to/file` in chat messages. The request sent to the language model will include a `<tagged_files>` block with the file contents. Snapshots are stored alongside each chat in `chat_n_meta.json`.
