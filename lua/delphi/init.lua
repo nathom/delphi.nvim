@@ -82,16 +82,32 @@ local function setup_chat_cmd(config)
 			buf = P.open_new_chat_buffer(config.system_prompt)
 			vim.b.is_delphi_chat = true
 			vim.b.delphi_chat_path = P.next_chat_path()
+			vim.b.delphi_meta_path = vim.b.delphi_chat_path:gsub("%.md$", "_meta.json")
 			P.save_chat(buf)
 			return
 		end
 
 		local transcript = P.read_buf(buf)
 		local messages = P.to_messages(transcript)
+
+		local meta = P.read_chat_meta(vim.b.delphi_chat_path)
+		local cur_lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+		local invalid = P.chat_invalidated(cur_lines, meta)
+		if invalid then
+			vim.notify("delphi: chat metadata file invalidated. resetting.", vim.log.levels.WARN)
+			P.reset_meta(vim.b.delphi_chat_path)
+			meta = P.read_chat_meta(vim.b.delphi_chat_path)
+		end
+
 		local last_role = (#messages > 0) and messages[#messages].role or ""
-		if last_role ~= "user" then -- nothing new to send
+		if last_role ~= "user" then
 			return vim.notify("The last message must be from the User!")
 		end
+
+		local new_meta, new_messages = P.resolve_tags(meta, messages)
+		new_meta.stored_lines = cur_lines
+
+		P.write_chat_meta(vim.b.delphi_chat_path, new_meta)
 
 		P.append_line_to_buf(buf, "")
 		P.append_line_to_buf(buf, P.headers.assistant)
@@ -110,7 +126,7 @@ local function setup_chat_cmd(config)
 		end
 		openai.chat(model, {
 			stream = true,
-			messages = messages,
+			messages = new_messages,
 		}, {
 			on_chunk = vim.schedule_wrap(function(chunk, is_done)
 				if is_done then
@@ -218,10 +234,16 @@ function M.setup(opts)
 	for k, v in pairs(models) do
 		models[k] = Model.new(v)
 	end
+
 	M.opts = vim.tbl_deep_extend("force", M.opts, opts or {})
 	P.set_headers(M.opts.chat.headers)
 	setup_chat_cmd(M.opts.chat)
 	setup_refactor_cmd(M.opts.refactor)
+
+	local ok, cmp = pcall(require, "cmp")
+	if ok then
+		cmp.register_source("delphi_path", require("delphi.cmp_source"))
+	end
 end
 
 return M
