@@ -9,7 +9,6 @@
 --       on_chunk   = vim.schedule_wrap(function(chunk)
 --           -- chunk.choices[1].delta.content
 --       end),
---       on_done    = function() print('done') end,
 --       on_error   = vim.notify,
 --   })
 
@@ -30,7 +29,7 @@ end
 --- Send a chat completion request.
 ---@param model Model
 ---@param body table
----@param cb   {on_chunk: function, on_complete: function, on_done: function, on_error: function}
+---@param cb   {on_chunk: function, on_complete: function, on_error: function}
 ---@return vim.SystemObj?
 function M.chat(model, body, cb)
 	body.model = model.model_name
@@ -61,7 +60,7 @@ function M.chat(model, body, cb)
 			end
 			local chunk = vim.trim(line:sub(6))
 			if chunk == "[DONE]" then
-				if cb.on_done then
+				if cb.on_chunk then
 					vim.schedule(function()
 						cb.on_chunk(nil, true)
 					end)

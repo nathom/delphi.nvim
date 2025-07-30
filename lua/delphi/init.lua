@@ -51,35 +51,35 @@ local function get_delta(chunk)
 end
 
 local function setup_chat_cmd(config)
-        vim.api.nvim_create_user_command("Chat", function(opts)
-                local args = opts.fargs
+	vim.api.nvim_create_user_command("Chat", function(opts)
+		local args = opts.fargs
 
-                if args[1] == "list" then
-                        for i, item in ipairs(P.list_chats()) do
-                                print(string.format("%d. %s", i - 1, item.preview))
-                        end
-                        return
-                elseif args[1] == "go" and args[2] then
-                        local idx = tonumber(args[2])
-                        if not idx then
-                                return vim.notify("Invalid chat number")
-                        end
-                        local entry = P.list_chats()[idx + 1]
-                        if not entry then
-                                return vim.notify("Chat not found")
-                        end
-                        P.open_chat_file(entry.path)
-                        return
-                end
+		if args[1] == "list" then
+			for i, item in ipairs(P.list_chats()) do
+				print(string.format("%d. %s", i - 1, item.preview))
+			end
+			return
+		elseif args[1] == "go" and args[2] then
+			local idx = tonumber(args[2])
+			if not idx then
+				return vim.notify("Invalid chat number")
+			end
+			local entry = P.list_chats()[idx + 1]
+			if not entry then
+				return vim.notify("Chat not found")
+			end
+			P.open_chat_file(entry.path)
+			return
+		end
 
-                local buf = vim.api.nvim_get_current_buf()
-                if not vim.b.is_delphi_chat then
-                        buf = P.open_new_chat_buffer(config.system_prompt)
-                        vim.b.is_delphi_chat = true
-                        vim.b.delphi_chat_path = P.next_chat_path()
-                        P.save_chat(buf)
-                        return
-                end
+		local buf = vim.api.nvim_get_current_buf()
+		if not vim.b.is_delphi_chat then
+			buf = P.open_new_chat_buffer(config.system_prompt)
+			vim.b.is_delphi_chat = true
+			vim.b.delphi_chat_path = P.next_chat_path()
+			P.save_chat(buf)
+			return
+		end
 
 		local transcript = P.read_buf(buf)
 		local messages = P.to_messages(transcript)
@@ -113,18 +113,15 @@ local function setup_chat_cmd(config)
 					P.append_line_to_buf(buf, "User: ")
 					P.append_line_to_buf(buf, "")
 					P.set_cursor_to_user(buf)
+					P.save_chat(buf)
 					return
 				end
 				P.append_chunk_to_buf(buf, get_delta(chunk))
 			end),
 
-                        on_done = function()
-                                P.save_chat(buf)
-                        end,
-
 			on_error = vim.notify,
 		})
-        end, { nargs = "*" })
+	end, { nargs = "*" })
 end
 
 local function setup_refactor_cmd(config)
@@ -202,7 +199,6 @@ local function setup_refactor_cmd(config)
 					end
 				end),
 
-				on_done = function() end,
 				on_error = function(err_output)
 					print("called on error")
 				end,
