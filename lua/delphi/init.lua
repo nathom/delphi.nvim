@@ -79,18 +79,7 @@ local function setup_chat_cmd(config)
 
 		local buf = vim.api.nvim_get_current_buf()
 		if not vim.b.is_delphi_chat then
-			local default_model
-			if M.opts.allow_env_var_config and os.getenv("DELPHI_DEFAULT_CHAT_MODEL") then
-				default_model = os.getenv("DELPHI_DEFAULT_CHAT_MODEL")
-			else
-				default_model = config.default_model
-			end
-			local model_obj = M.opts.models[default_model] or {}
-
-			buf = P.open_new_chat_buffer(config.system_prompt, {
-				model = default_model,
-				temperature = model_obj.temperature,
-			})
+			buf = P.open_new_chat_buffer(config.system_prompt)
 			vim.b.is_delphi_chat = true
 			vim.b.delphi_chat_path = P.next_chat_path()
 			vim.b.delphi_meta_path = vim.b.delphi_chat_path:gsub("%.md$", "_meta.json")
@@ -99,7 +88,7 @@ local function setup_chat_cmd(config)
 		end
 
 		local transcript = P.read_buf(buf)
-		local messages, frontmatter = P.to_messages(transcript)
+		local messages = P.to_messages(transcript)
 
 		local meta = P.read_chat_meta(vim.b.delphi_chat_path)
 		local cur_lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
@@ -124,27 +113,20 @@ local function setup_chat_cmd(config)
 		P.append_line_to_buf(buf, P.headers.assistant)
 		P.append_line_to_buf(buf, "")
 
-		local chosen_model = frontmatter.model
-		if not chosen_model or M.opts.models[chosen_model] == nil then
-			if M.opts.allow_env_var_config and os.getenv("DELPHI_DEFAULT_CHAT_MODEL") then
-				chosen_model = os.getenv("DELPHI_DEFAULT_CHAT_MODEL")
-			else
-				chosen_model = config.default_model
-			end
+		local default_model
+		if M.opts.allow_env_var_config and os.getenv("DELPHI_DEFAULT_CHAT_MODEL") then
+			default_model = os.getenv("DELPHI_DEFAULT_CHAT_MODEL")
+		else
+			default_model = config.default_model
 		end
-
-		local model = M.opts.models[chosen_model]
+		local model = M.opts.models[default_model]
 		if model == nil then
-			vim.notify("Coudln't find model " .. tostring(chosen_model), vim.log.levels.ERROR)
+			vim.notify("Coudln't find model " .. tostring(default_model), vim.log.levels.ERROR)
 			return
 		end
-
-		local temperature = tonumber(frontmatter.temperature) or model.temperature
-
 		openai.chat(model, {
 			stream = true,
 			messages = new_messages,
-			temperature = temperature,
 		}, {
 			on_chunk = vim.schedule_wrap(function(chunk, is_done)
 				if is_done then
