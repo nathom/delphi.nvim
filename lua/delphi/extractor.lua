@@ -41,14 +41,16 @@ local function end_tick_1(code, c)
 	if c == "`" then
 		return code, "END_TICK_2"
 	end
-	return code .. c, "RECORDING"
+	-- not actually a code fence, flush the pending tick
+	return code .. "`" .. c, "RECORDING"
 end
 
 local function end_tick_2(code, c)
 	if c == "`" then
 		return code, "DONE"
 	end
-	return code .. c, "RECORDING"
+	-- not actually a code fence, flush the pending ticks
+	return code .. "``" .. c, "RECORDING"
 end
 
 local function end_tick_3(code, c)
@@ -94,6 +96,11 @@ function Extractor:update(delta)
 end
 
 function Extractor:get_code()
+	if self.state == "END_TICK_1" then
+		return self.code .. "`"
+	elseif self.state == "END_TICK_2" then
+		return self.code .. "``"
+	end
 	return self.code
 end
 
