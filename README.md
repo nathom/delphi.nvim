@@ -2,7 +2,23 @@
 
 A tasteful LLM plugin. Under construction.
 
-## default opts
+## Configuration
+
+These are the schema:
+
+```lua
+---@class Model
+---@field base_url string
+---@field api_key_env_var string
+---@field model_name string
+---@field temperature number
+
+---@class Config
+---@field models table<string, Model>
+---@field allow_env_var_config boolean
+---@field chat { system_prompt: string, default_model: string?, headers: { system: string, user: string, assistant: string } }
+---@field refactor { system_prompt: string, default_model: string?, prompt_template: string, accept_keymap: string, reject_keymap: string }
+```
 
 ```lua
 opts = {
