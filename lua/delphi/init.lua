@@ -20,6 +20,7 @@ local default_opts = {
 	},
 	refactor = {
 		default_model = nil,
+		-- TODO: experiment with diff prompt for nested ticks
 		system_prompt = [[
 You are an expert refactoring assistant. Return ONLY the rewritten code in one fenced block:
 ```
