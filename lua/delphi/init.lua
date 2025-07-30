@@ -204,9 +204,7 @@ local function setup_refactor_cmd(config)
 					end
 				end),
 
-				on_error = function(err_output)
-					print("called on error")
-				end,
+				on_error = function() end,
 			})
 		end)
 	end, { range = true, desc = "LLM-rewrite the current visual selection" })
