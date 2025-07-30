@@ -233,16 +233,12 @@ function P.save_chat(buf, path)
 	end
 	local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
 	vim.fn.writefile(lines, path)
-	local meta = P.read_chat_meta(path)
-	meta.stored_lines = lines
-	P.write_chat_meta(path, meta)
 end
 
 ---List available chats
 ---@return { path:string, preview:string }[]
 function P.list_chats()
 	local dir = P.chat_data_dir()
-	print("dir", dir)
 	local files = vim.fn.readdir(dir)
 	table.sort(files, function(a, b)
 		local na = tonumber(a:match("^chat_(%d+)")) or 0
@@ -491,8 +487,9 @@ function P.resolve_tags(meta, messages)
 			end
 			table.insert(prompt_lines, "</tagged_files>")
 			table.insert(prompt_lines, msg.content)
-
 			table.insert(new_messages, { content = table.concat(prompt_lines, "\n"), role = msg.role })
+		else
+			table.insert(new_messages, msg)
 		end
 	end
 	return meta, new_messages
@@ -508,16 +505,21 @@ local function filter_empty(tbl)
 	return ret
 end
 
+---@param cur_lines string[]
+---@param meta Metadata
+---@return boolean
 function P.chat_invalidated(cur_lines, meta)
 	local cur_lines_filtered = filter_empty(cur_lines)
-	local valid = not meta.invalid
-	for i = 1, #filter_empty(meta.stored_lines) do
-		if cur_lines_filtered[i] ~= meta.stored_lines[i] then
-			valid = false
-			break
+	local stored_filtered = filter_empty(meta.stored_lines or {})
+	if meta.invalid then
+		return true
+	end
+	for i = 1, #stored_filtered do
+		if cur_lines_filtered[i] ~= stored_filtered[i] then
+			return true
 		end
 	end
-	return valid
+	return false
 end
 
 return P

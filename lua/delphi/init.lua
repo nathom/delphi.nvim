@@ -87,26 +87,14 @@ local function setup_chat_cmd(config)
 			return
 		end
 
-		local function p(obj)
-			vim.notify(vim.inspect(obj))
-		end
-
 		local transcript = P.read_buf(buf)
 		local messages = P.to_messages(transcript)
-		p(messages)
-		p(vim.b.delphi_chat_path)
 
 		local meta = P.read_chat_meta(vim.b.delphi_chat_path)
-		p(meta)
 		local cur_lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-		p(cur_lines)
 		local invalid = P.chat_invalidated(cur_lines, meta)
-		p(invalid)
-		if true then
-			return
-		end
-
 		if invalid then
+			vim.notify("delphi: chat metadata file invalidated. resetting.", vim.log.levels.WARN)
 			P.reset_meta(vim.b.delphi_chat_path)
 			meta = P.read_chat_meta(vim.b.delphi_chat_path)
 		end
