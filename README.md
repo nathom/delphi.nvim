@@ -1,3 +1,43 @@
 # delphi.nvim
 
 A tasteful LLM plugin. Under construction.
+
+## default opts
+
+```lua
+opts = {
+	models = {},
+	allow_env_var_config = false,
+	chat = {
+		system_prompt = "",
+		default_model = nil,
+		headers = {
+			system = "System:",
+			user = "User:",
+			assistant = "Assistant:",
+		},
+	},
+	refactor = {
+		default_model = nil,
+		system_prompt = [[
+You are an expert refactoring assistant. Return ONLY the rewritten code in one fenced block:
+\```
+...
+```.]],
+		prompt_template = [[
+Full file for context:
+\```
+{{file_text}}
+\```
+
+Selected lines ({{selection_start_lnum}}:{{selection_end_lnum}}):
+\```
+{{selected_text}}
+\```
+
+Instruction: {{user_instructions}}. Return ONLY the refactored code within a code block. Preserve formatting unless told otherwise. Try to keep the diff minimal while following the instructions exactly.]],
+		accept_keymap = "<leader>a",
+		reject_keymap = "<leader>r",
+	},
+}
+```
