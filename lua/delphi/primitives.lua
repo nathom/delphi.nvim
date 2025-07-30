@@ -156,6 +156,102 @@ function P.open_new_chat_buffer(system_prompt)
 	return buf
 end
 
+-- Persistent chat helpers ----------------------------------------------------
+
+---Return directory for chat transcripts (created on demand)
+---@return string
+function P.chat_data_dir()
+	local dir = vim.fn.stdpath("data") .. "/delphi.nvim/chats"
+	if vim.fn.isdirectory(dir) == 0 then
+		vim.fn.mkdir(dir, "p")
+	end
+	return dir
+end
+
+---Generate a path for a new chat transcript
+---@return string
+function P.next_chat_path()
+	local dir = P.chat_data_dir()
+	local files = vim.fn.readdir(dir)
+	local max = -1
+	for _, f in ipairs(files) do
+		local n = tonumber(f:match("^(%d+)%.md$"))
+		if n and n > max then
+			max = n
+		end
+	end
+	return string.format("%s/%d.md", dir, max + 1)
+end
+
+---Open a chat from a file path
+---@param path string
+---@return integer buf
+function P.open_chat_file(path)
+	local ok, lines = pcall(vim.fn.readfile, path)
+	if not ok then
+		lines = {}
+	end
+	vim.cmd("enew")
+	local buf = vim.api.nvim_get_current_buf()
+	vim.bo.buftype, vim.bo.bufhidden, vim.bo.filetype = "nofile", "hide", "markdown"
+	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+	vim.b.is_delphi_chat = true
+	vim.b.delphi_chat_path = path
+	P.set_cursor_to_user(buf)
+	return buf
+end
+
+---Save a chat buffer to its associated path
+---@param buf integer|nil
+---@param path string|nil
+function P.save_chat(buf, path)
+	buf = buf or 0
+	path = path or vim.b[buf].delphi_chat_path
+	if not path or path == "" then
+		return
+	end
+	local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+	vim.fn.writefile(lines, path)
+end
+
+---List available chats
+---@return table[] -- { path=string, preview=string }
+function P.list_chats()
+	local dir = P.chat_data_dir()
+	print("dir", dir)
+	local files = vim.fn.readdir(dir)
+	table.sort(files, function(a, b)
+		local na = tonumber(a:match("^(%d+)")) or 0
+		local nb = tonumber(b:match("^(%d+)")) or 0
+		return na < nb
+	end)
+
+	local res = {}
+	for _, f in ipairs(files) do
+		if f:match("^%d+%.md$") then
+			local p = dir .. "/" .. f
+			local ok, lines = pcall(vim.fn.readfile, p)
+			if ok then
+				local text = table.concat(lines, "\n")
+				local msgs = P.to_messages(text)
+				local preview = ""
+				for _, m in ipairs(msgs) do
+					if m.role == "user" then
+						preview = m.content
+						break
+					end
+				end
+				preview = preview:gsub("\n", " "):gsub("%.%s.*", ".")
+				if #preview > 40 then
+					preview = preview:sub(1, 37) .. "..."
+				end
+				table.insert(res, { path = p, preview = preview })
+			end
+		end
+	end
+	return res
+end
+
 ---Return current visual selection (or current line if none).
 --- @param buf integer|nil
 --- @return table  -- { lines = {...}, start_lnum = n, end_lnum = n }

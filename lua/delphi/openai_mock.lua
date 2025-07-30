@@ -22,8 +22,8 @@ def fib(n: int, cache: dict[int, int] = defaultdict(int)):
 
 	local function tick()
 		if i > #new_text then
-			if cb.on_done then
-				cb.on_done("done")
+			if cb.on_chunk then
+				cb.on_chunk(nil, true)
 			end
 			timer:stop()
 			-- timer:close()
@@ -36,7 +36,6 @@ def fib(n: int, cache: dict[int, int] = defaultdict(int)):
 
 	local function tick1()
 		cb.on_chunk({ choices = { { delta = { content = new_text } } } })
-		cb.on_done()
 		timer:stop()
 	end
 
