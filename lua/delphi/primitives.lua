@@ -57,6 +57,59 @@ local function get_header(line)
 	return hdr
 end
 
+-- frontmatter helpers --------------------------------------------------------
+
+local function parse_frontmatter_lines(lines)
+	if not lines[1] or lines[1] ~= "---" then
+		return {}, 0
+	end
+	local ret = {}
+	for i = 2, #lines do
+		local l = lines[i]
+		if l == "---" then
+			return ret, i
+		end
+		local k, v = l:match("^%s*(%S+)%s*:%s*(.*)%s*$")
+		if k and v then
+			local num = tonumber(v)
+			ret[k] = num or v
+		end
+	end
+	return ret, #lines
+end
+
+local function strip_frontmatter_lines(lines)
+	local _, idx = parse_frontmatter_lines(lines)
+	if idx == 0 then
+		return lines
+	end
+	local res = {}
+	local start = idx + 1
+	if lines[start] == "" then
+		start = start + 1
+	end
+	for i = start, #lines do
+		res[#res + 1] = lines[i]
+	end
+	return res
+end
+
+function P.parse_frontmatter(buf_or_lines)
+	local lines
+	if type(buf_or_lines) == "table" then
+		lines = buf_or_lines
+	else
+		local buf = buf_or_lines or 0
+		lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+	end
+	local fm = parse_frontmatter_lines(lines)
+	return fm
+end
+
+function P.strip_frontmatter(lines)
+	return strip_frontmatter_lines(lines)
+end
+
 function P.foldexpr(lnum)
 	local line = vim.api.nvim_buf_get_lines(0, lnum - 1, lnum, false)[1] or ""
 	if get_header(line) ~= nil then
@@ -153,7 +206,7 @@ function P.read_buf(buf)
 	return table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), "\n")
 end
 
-function P.open_new_chat_buffer(system_prompt)
+function P.open_new_chat_buffer(system_prompt, model_name, temperature)
 	vim.cmd("enew") -- new buffer, same window
 	local buf = vim.api.nvim_get_current_buf()
 
@@ -163,6 +216,11 @@ function P.open_new_chat_buffer(system_prompt)
 	-- vim.wo.foldexpr = "v:lua.delphi_foldexpr(v:lnum)"
 
 	local lines = {
+		"---",
+		string.format("model: %s", tostring(model_name or "")),
+		string.format("temperature: %s", tostring(temperature or "")),
+		"---",
+		"",
 		P.headers.system,
 		system_prompt or "",
 		"", -- spacer
@@ -509,8 +567,8 @@ end
 ---@param meta Metadata
 ---@return boolean
 function P.chat_invalidated(cur_lines, meta)
-	local cur_lines_filtered = filter_empty(cur_lines)
-	local stored_filtered = filter_empty(meta.stored_lines or {})
+	local cur_lines_filtered = filter_empty(P.strip_frontmatter(cur_lines))
+	local stored_filtered = filter_empty(P.strip_frontmatter(meta.stored_lines or {}))
 	if meta.invalid then
 		return true
 	end

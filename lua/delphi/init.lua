@@ -79,7 +79,14 @@ local function setup_chat_cmd(config)
 
 		local buf = vim.api.nvim_get_current_buf()
 		if not vim.b.is_delphi_chat then
-			buf = P.open_new_chat_buffer(config.system_prompt)
+			local default_model
+			if M.opts.allow_env_var_config and os.getenv("DELPHI_DEFAULT_CHAT_MODEL") then
+				default_model = os.getenv("DELPHI_DEFAULT_CHAT_MODEL")
+			else
+				default_model = config.default_model
+			end
+			local model_cfg = M.opts.models[default_model] or {}
+			buf = P.open_new_chat_buffer(config.system_prompt, default_model, model_cfg.temperature)
 			vim.b.is_delphi_chat = true
 			vim.b.delphi_chat_path = P.next_chat_path()
 			vim.b.delphi_meta_path = vim.b.delphi_chat_path:gsub("%.md$", "_meta.json")
@@ -119,14 +126,18 @@ local function setup_chat_cmd(config)
 		else
 			default_model = config.default_model
 		end
-		local model = M.opts.models[default_model]
+		local fm = P.parse_frontmatter(buf)
+		local model_name = fm.model or default_model
+		local model = M.opts.models[model_name]
 		if model == nil then
-			vim.notify("Coudln't find model " .. tostring(default_model), vim.log.levels.ERROR)
+			vim.notify("Coudln't find model " .. tostring(model_name), vim.log.levels.ERROR)
 			return
 		end
+		local temperature = fm.temperature or model.temperature
 		openai.chat(model, {
 			stream = true,
 			messages = new_messages,
+			temperature = temperature,
 		}, {
 			on_chunk = vim.schedule_wrap(function(chunk, is_done)
 				if is_done then
