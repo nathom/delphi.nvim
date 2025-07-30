@@ -2,22 +2,22 @@ local P = {}
 
 -- Header strings used in chat buffers
 P.headers = {
-        system = "System:",
-        user = "User:",
-        assistant = "Assistant:",
+	system = "System:",
+	user = "User:",
+	assistant = "Assistant:",
 }
 
 ---Override the default chat headers
 ---@param hdrs {system?:string,user?:string,assistant?:string}|nil
 function P.set_headers(hdrs)
-        if not hdrs then
-                return
-        end
-        for k, v in pairs(hdrs) do
-                if type(v) == "string" then
-                        P.headers[k] = v
-                end
-        end
+	if not hdrs then
+		return
+	end
+	for k, v in pairs(hdrs) do
+		if type(v) == "string" then
+			P.headers[k] = v
+		end
+	end
 end
 
 ---Fill in a template string
@@ -46,15 +46,15 @@ local function strip(s)
 end
 
 local function get_header(line)
-        local hdr = nil
-        if starts_with(line, P.headers.system) then
-                hdr = "system"
-        elseif starts_with(line, P.headers.user) then
-                hdr = "user"
-        elseif starts_with(line, P.headers.assistant) then
-                hdr = "assistant"
-        end
-        return hdr
+	local hdr = nil
+	if starts_with(line, P.headers.system) then
+		hdr = "system"
+	elseif starts_with(line, P.headers.user) then
+		hdr = "user"
+	elseif starts_with(line, P.headers.assistant) then
+		hdr = "assistant"
+	end
+	return hdr
 end
 
 function P.foldexpr(lnum)
@@ -132,14 +132,14 @@ end
 -- Move cursor to the last “User:” prompt in the given buffer
 ---@param buf integer
 function P.set_cursor_to_user(buf)
-        local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-        for i = #lines, 1, -1 do
-                if lines[i]:match("^%s*" .. vim.pesc(P.headers.user)) then
-                        for _, win in ipairs(vim.api.nvim_list_wins()) do
-                                if vim.api.nvim_win_get_buf(win) == buf then
-                                        vim.api.nvim_set_current_win(win)
-                                        vim.api.nvim_win_set_cursor(win, { i + 1, 0 })
-                                        return
+	local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+	for i = #lines, 1, -1 do
+		if lines[i]:match("^%s*" .. vim.pesc(P.headers.user)) then
+			for _, win in ipairs(vim.api.nvim_list_wins()) do
+				if vim.api.nvim_win_get_buf(win) == buf then
+					vim.api.nvim_set_current_win(win)
+					vim.api.nvim_win_set_cursor(win, { i + 1, 0 })
+					return
 				end
 			end
 		end
@@ -162,13 +162,13 @@ function P.open_new_chat_buffer(system_prompt)
 	-- vim.wo.foldmethod = "expr"
 	-- vim.wo.foldexpr = "v:lua.delphi_foldexpr(v:lnum)"
 
-        local lines = {
-                P.headers.system,
-                system_prompt or "",
-                "", -- spacer
-                P.headers.user,
-                "", -- where the user types
-        }
+	local lines = {
+		P.headers.system,
+		system_prompt or "",
+		"", -- spacer
+		P.headers.user,
+		"", -- where the user types
+	}
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
 
 	P.set_cursor_to_user(buf) -- jump to User prompt
@@ -235,7 +235,7 @@ function P.save_chat(buf, path)
 end
 
 ---List available chats
----@return table[] -- { path=string, preview=string }
+---@return { path:string, preview:string }[]
 function P.list_chats()
 	local dir = P.chat_data_dir()
 	print("dir", dir)
