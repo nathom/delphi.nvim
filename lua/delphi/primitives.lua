@@ -191,51 +191,51 @@ end
 ---Generate a path for a new chat transcript
 ---@return string
 function P.next_chat_path()
-        local dir = P.chat_data_dir()
-        local files = vim.fn.readdir(dir)
-        local max = -1
-        for _, f in ipairs(files) do
-                local n = tonumber(f:match("^chat_(%d+)%.md$"))
-                if n and n > max then
-                        max = n
-                end
-        end
-        return string.format("%s/chat_%d.md", dir, max + 1)
+	local dir = P.chat_data_dir()
+	local files = vim.fn.readdir(dir)
+	local max = -1
+	for _, f in ipairs(files) do
+		local n = tonumber(f:match("^chat_(%d+)%.md$"))
+		if n and n > max then
+			max = n
+		end
+	end
+	return string.format("%s/chat_%d.md", dir, max + 1)
 end
 
 ---Open a chat from a file path
 ---@param path string
 ---@return integer buf
 function P.open_chat_file(path)
-        local ok, lines = pcall(vim.fn.readfile, path)
-        if not ok then
-                lines = {}
-        end
-        vim.cmd("enew")
-        local buf = vim.api.nvim_get_current_buf()
-        vim.bo.buftype, vim.bo.bufhidden, vim.bo.filetype = "nofile", "hide", "markdown"
-        vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-        vim.b.is_delphi_chat = true
-        vim.b.delphi_chat_path = path
-        vim.b.delphi_meta_path = path:gsub("%.md$", "_meta.json")
-        P.set_cursor_to_user(buf)
-        return buf
+	local ok, lines = pcall(vim.fn.readfile, path)
+	if not ok then
+		lines = {}
+	end
+	vim.cmd("enew")
+	local buf = vim.api.nvim_get_current_buf()
+	vim.bo.buftype, vim.bo.bufhidden, vim.bo.filetype = "nofile", "hide", "markdown"
+	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+	vim.b.is_delphi_chat = true
+	vim.b.delphi_chat_path = path
+	vim.b.delphi_meta_path = path:gsub("%.md$", "_meta.json")
+	P.set_cursor_to_user(buf)
+	return buf
 end
 
 ---Save a chat buffer to its associated path
 ---@param buf integer|nil
 ---@param path string|nil
 function P.save_chat(buf, path)
-        buf = buf or 0
-        path = path or vim.b[buf].delphi_chat_path
-        if not path or path == "" then
-                return
-        end
-        local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-        vim.fn.writefile(lines, path)
-        local meta = P.read_chat_meta(path)
-        meta.stored_lines = lines
-        P.write_chat_meta(path, meta)
+	buf = buf or 0
+	path = path or vim.b[buf].delphi_chat_path
+	if not path or path == "" then
+		return
+	end
+	local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+	vim.fn.writefile(lines, path)
+	local meta = P.read_chat_meta(path)
+	meta.stored_lines = lines
+	P.write_chat_meta(path, meta)
 end
 
 ---List available chats
@@ -244,16 +244,16 @@ function P.list_chats()
 	local dir = P.chat_data_dir()
 	print("dir", dir)
 	local files = vim.fn.readdir(dir)
-        table.sort(files, function(a, b)
-                local na = tonumber(a:match("^chat_(%d+)")) or 0
-                local nb = tonumber(b:match("^chat_(%d+)")) or 0
-                return na < nb
-        end)
+	table.sort(files, function(a, b)
+		local na = tonumber(a:match("^chat_(%d+)")) or 0
+		local nb = tonumber(b:match("^chat_(%d+)")) or 0
+		return na < nb
+	end)
 
 	local res = {}
-        for _, f in ipairs(files) do
-                if f:match("^chat_%d+%.md$") then
-                        local p = dir .. "/" .. f
+	for _, f in ipairs(files) do
+		if f:match("^chat_%d+%.md$") then
+			local p = dir .. "/" .. f
 			local ok, lines = pcall(vim.fn.readfile, p)
 			if ok then
 				local text = table.concat(lines, "\n")
@@ -389,51 +389,135 @@ end
 -- chat metadata helpers ------------------------------------------------------
 
 function P.chat_meta_path(chat_path)
-        return chat_path:gsub("%.md$", "_meta.json")
+	return chat_path:gsub("%.md$", "_meta.json")
 end
 
 function P.read_chat_meta(chat_path)
-        local meta_path = P.chat_meta_path(chat_path)
-        local ok, lines = pcall(vim.fn.readfile, meta_path)
-        if not ok then
-                return { tags = {}, stored_lines = {}, invalid = false }
-        end
-        local ok2, decoded = pcall(vim.json.decode, table.concat(lines, "\n"), { luanil = { object = true, array = true } })
-        if not ok2 or type(decoded) ~= "table" then
-                decoded = {}
-        end
-        decoded.tags = decoded.tags or {}
-        decoded.stored_lines = decoded.stored_lines or {}
-        decoded.invalid = decoded.invalid or false
-        return decoded
+	local meta_path = P.chat_meta_path(chat_path)
+	local ok, lines = pcall(vim.fn.readfile, meta_path)
+	if not ok then
+		return { tags = {}, stored_lines = {}, invalid = false }
+	end
+	local ok2, decoded = pcall(vim.json.decode, table.concat(lines, "\n"), { luanil = { object = true, array = true } })
+	if not ok2 or type(decoded) ~= "table" then
+		decoded = {}
+	end
+	decoded.tags = decoded.tags or {}
+	decoded.stored_lines = decoded.stored_lines or {}
+	decoded.invalid = decoded.invalid or false
+	return decoded
 end
 
 function P.write_chat_meta(chat_path, meta)
-        local meta_path = P.chat_meta_path(chat_path)
-        vim.fn.writefile({ vim.json.encode(meta) }, meta_path)
+	local meta_path = P.chat_meta_path(chat_path)
+	vim.fn.writefile({ vim.json.encode(meta) }, meta_path)
+end
+
+function P.reset_meta(chat_path)
+	---@class Metadata
+	local blank_meta = {
+		invalid = false,
+		stored_lines = {},
+		tags = {},
+	}
+	local meta_path = P.chat_meta_path(chat_path)
+	vim.fn.writefile({ vim.json.encode(blank_meta) }, meta_path)
 end
 
 function P.invalidate_meta(buf)
-        local path = vim.b[buf].delphi_chat_path
-        if not path then
-                return
-        end
-        local meta = P.read_chat_meta(path)
-        if meta.invalid then
-                return
-        end
-        meta.invalid = true
-        P.write_chat_meta(path, meta)
-        vim.notify("delphi.nvim: chat metadata invalidated. Press 'u' to undo.", vim.log.levels.WARN)
-        local ns = vim.api.nvim_create_namespace("delphi_meta_undo")
-        vim.on_key(function(ch)
-                vim.on_key(nil, ns)
-                if ch == 'u' then
-                        vim.api.nvim_buf_set_lines(buf, 0, -1, false, meta.stored_lines or {})
-                        meta.invalid = false
-                        P.write_chat_meta(path, meta)
-                end
-        end, ns)
+	local path = vim.b[buf].delphi_chat_path
+	if not path then
+		return
+	end
+	local meta = P.read_chat_meta(path)
+	if meta.invalid then
+		return
+	end
+	meta.invalid = true
+	P.write_chat_meta(path, meta)
+	vim.notify("delphi.nvim: chat metadata invalidated. Press 'u' to undo.", vim.log.levels.WARN)
+	local ns = vim.api.nvim_create_namespace("delphi_meta_undo")
+	vim.on_key(function(ch)
+		vim.on_key(nil, ns)
+		if ch == "u" then
+			vim.api.nvim_buf_set_lines(buf, 0, -1, false, meta.stored_lines or {})
+			meta.invalid = false
+			P.write_chat_meta(path, meta)
+		end
+	end, ns)
+end
+
+---@class Metadata
+---@field stored_lines string[]
+---@field tags table<string, string[]>
+---@field invalid boolean
+
+---@class Message
+---@field role "system" | "user" | "assistant"
+---@field content string
+
+---Resolve tags in messages
+---@param meta Metadata
+---@param messages Message[]
+---@return Metadata, Message[]
+function P.resolve_tags(meta, messages)
+	local tag_counts = {}
+	local new_messages = {}
+	for _, msg in ipairs(messages) do
+		local tags_in_msg = {}
+		for tag in msg.content:gmatch("@(%S+)") do
+			tag_counts[tag] = (tag_counts[tag] or 0) + 1
+			local idx = tag_counts[tag]
+			meta.tags[tag] = meta.tags[tag] or {}
+			local content = meta.tags[tag][idx]
+			if not content then
+				local resolved = vim.fn.fnamemodify(tag, ":p")
+				local ok, lines = pcall(vim.fn.readfile, resolved)
+				if ok then
+					content = table.concat(lines, "\n")
+				else
+					content = ""
+				end
+				meta.tags[tag][idx] = content
+			end
+			table.insert(tags_in_msg, { path = tag, content = content })
+		end
+		if #tags_in_msg > 0 then
+			local prompt_lines = {}
+			table.insert(prompt_lines, "<tagged_files>")
+			for _, t in ipairs(tags_in_msg) do
+				local ext = t.path:match("%.([%w_]+)$") or ""
+				table.insert(prompt_lines, string.format("```%s %s\n%s\n```", ext, t.path, t.content))
+			end
+			table.insert(prompt_lines, "</tagged_files>")
+			table.insert(prompt_lines, msg.content)
+
+			table.insert(new_messages, { content = table.concat(prompt_lines, "\n"), role = msg.role })
+		end
+	end
+	return meta, new_messages
+end
+
+local function filter_empty(tbl)
+	local ret = {}
+	for _, v in ipairs(tbl) do
+		if v ~= "" then
+			table.insert(ret, v)
+		end
+	end
+	return ret
+end
+
+function P.chat_invalidated(cur_lines, meta)
+	local cur_lines_filtered = filter_empty(cur_lines)
+	local valid = not meta.invalid
+	for i = 1, #filter_empty(meta.stored_lines) do
+		if cur_lines_filtered[i] ~= meta.stored_lines[i] then
+			valid = false
+			break
+		end
+	end
+	return valid
 end
 
 return P

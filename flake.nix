@@ -18,6 +18,8 @@
           (neovim.override { configure = { }; })
           vimPlugins.plenary-nvim
           vimPlugins.telescope-nvim
+          vimPlugins.nvim-cmp
+          vimPlugins.cmp-path
           git
           curl
           jq
@@ -51,7 +53,7 @@
               {
                 dir = os.getenv("DELPHI_PATH"),
                 name = "delphi.nvim",
-                dependencies = { "nvim-lua/plenary.nvim", "nvim-telescope/telescope.nvim"},
+                dependencies = { "nvim-lua/plenary.nvim", "nvim-telescope/telescope.nvim", "hrsh7th/nvim-cmp", "hrsh7th/cmp-path"},
                 opts = {
                   allow_env_var_config = true,
                   chat = { default_model = "gemini_flash" },
