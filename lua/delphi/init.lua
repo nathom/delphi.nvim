@@ -78,20 +78,71 @@ local function setup_chat_cmd(config)
 		end
 
 		local buf = vim.api.nvim_get_current_buf()
-		if not vim.b.is_delphi_chat then
-			buf = P.open_new_chat_buffer(config.system_prompt)
-			vim.b.is_delphi_chat = true
-			vim.b.delphi_chat_path = P.next_chat_path()
-			P.save_chat(buf)
-			return
-		end
+                if not vim.b.is_delphi_chat then
+                        buf = P.open_new_chat_buffer(config.system_prompt)
+                        vim.b.is_delphi_chat = true
+                        vim.b.delphi_chat_path = P.next_chat_path()
+                        vim.b.delphi_meta_path = vim.b.delphi_chat_path:gsub("%.md$", "_meta.json")
+                        P.save_chat(buf)
+                        return
+                end
 
-		local transcript = P.read_buf(buf)
-		local messages = P.to_messages(transcript)
-		local last_role = (#messages > 0) and messages[#messages].role or ""
-		if last_role ~= "user" then -- nothing new to send
-			return vim.notify("The last message must be from the User!")
-		end
+                local transcript = P.read_buf(buf)
+                local messages = P.to_messages(transcript)
+
+                local meta = P.read_chat_meta(vim.b.delphi_chat_path)
+                local cur_lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+                local valid = not meta.invalid
+                for i = 1, #meta.stored_lines do
+                        if cur_lines[i] ~= meta.stored_lines[i] then
+                                valid = false
+                                break
+                        end
+                end
+                if not valid then
+                        P.invalidate_meta(buf)
+                        if P.read_chat_meta(vim.b.delphi_chat_path).invalid then
+                                return
+                        end
+                        meta = P.read_chat_meta(vim.b.delphi_chat_path)
+                end
+
+                local last_role = (#messages > 0) and messages[#messages].role or ""
+                if last_role ~= "user" then
+                        return vim.notify("The last message must be from the User!")
+                end
+
+                local tag_counts = {}
+                for i, msg in ipairs(messages) do
+                        local tags_in_msg = {}
+                        for tag in msg.content:gmatch("@(%S+)") do
+                                tag_counts[tag] = (tag_counts[tag] or 0) + 1
+                                local idx = tag_counts[tag]
+                                meta.tags[tag] = meta.tags[tag] or {}
+                                local content = meta.tags[tag][idx]
+                                if not content then
+                                        local resolved = vim.fn.fnamemodify(tag, ":p")
+                                        local ok, lines = pcall(vim.fn.readfile, resolved)
+                                        if ok then
+                                                content = table.concat(lines, "\n")
+                                        else
+                                                content = ""
+                                        end
+                                        meta.tags[tag][idx] = content
+                                end
+                                table.insert(tags_in_msg, { path = tag, content = content })
+                        end
+                        if #tags_in_msg > 0 then
+                                local blocks = {}
+                                for _, t in ipairs(tags_in_msg) do
+                                        local ext = t.path:match("%.([%w_]+)$") or ""
+                                        table.insert(blocks, string.format("```%s %s\n%s\n```", ext, t.path, t.content))
+                                end
+                                local tag_section = "<tagged_files>\n" .. table.concat(blocks, "\n") .. "\n</tagged_files>\n"
+                                msg.content = tag_section .. msg.content
+                        end
+                end
+                P.write_chat_meta(vim.b.delphi_chat_path, meta)
 
                 P.append_line_to_buf(buf, "")
                 P.append_line_to_buf(buf, P.headers.assistant)
@@ -221,9 +272,14 @@ function M.setup(opts)
 		models[k] = Model.new(v)
 	end
         M.opts = vim.tbl_deep_extend("force", M.opts, opts or {})
-        P.set_headers(M.opts.chat.headers)
-        setup_chat_cmd(M.opts.chat)
-	setup_refactor_cmd(M.opts.refactor)
+       P.set_headers(M.opts.chat.headers)
+       setup_chat_cmd(M.opts.chat)
+       setup_refactor_cmd(M.opts.refactor)
+
+        local ok, cmp = pcall(require, 'cmp')
+        if ok then
+                cmp.register_source('delphi_path', require('delphi.cmp_source'))
+        end
 end
 
 return M
