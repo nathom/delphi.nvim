@@ -33,6 +33,9 @@ end
 ---@return vim.SystemObj?
 function M.chat(model, body, cb)
 	body.model = model.model_name
+	if body.temperature == nil then
+		body.temperature = model.temperature
+	end
 	local payload = vim.json.encode(body)
 
 	local cmd = {

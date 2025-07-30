@@ -57,6 +57,52 @@ local function get_header(line)
 	return hdr
 end
 
+local function parse_frontmatter(lines)
+	if lines[1] ~= "---" then
+		return {}, lines
+	end
+
+	local fm = {}
+	local end_idx
+	for i = 2, #lines do
+		if lines[i] == "---" then
+			end_idx = i
+			break
+		end
+		local key, val = lines[i]:match("^([%w_]+)%s*:%s*(.+)$")
+		if key and val then
+			fm[key] = val
+		end
+	end
+
+	if not end_idx then
+		return {}, lines
+	end
+
+	local rest = {}
+	for i = end_idx + 1, #lines do
+		rest[#rest + 1] = lines[i]
+	end
+	return fm, rest
+end
+
+local function strip_frontmatter(lines)
+	local _, rest = parse_frontmatter(lines)
+	return rest
+end
+
+function P.frontmatter_lines(tbl)
+	if not tbl then
+		return {}
+	end
+	local lines = { "---" }
+	for k, v in pairs(tbl) do
+		table.insert(lines, string.format("%s: %s", k, tostring(v)))
+	end
+	table.insert(lines, "---")
+	return lines
+end
+
 function P.foldexpr(lnum)
 	local line = vim.api.nvim_buf_get_lines(0, lnum - 1, lnum, false)[1] or ""
 	if get_header(line) ~= nil then
@@ -74,6 +120,11 @@ _G.delphi_foldexpr = P.foldexpr
 ---@param input string
 ---@return table[]  -- { {role='user', content='…'}, … }
 function P.to_messages(input)
+	local lines = vim.split(input, "\n", { plain = true, trimempty = false })
+
+	local frontmatter
+	frontmatter, lines = parse_frontmatter(lines)
+
 	local msgs, role, body = {}, nil, {}
 
 	local function push()
@@ -86,7 +137,7 @@ function P.to_messages(input)
 		body = {}
 	end
 
-	for line in input:gmatch("[^\n]*") do
+	for _, line in ipairs(lines) do
 		-- pure header line (no body on same line)
 		local hdr = get_header(line)
 		if hdr then
@@ -97,7 +148,7 @@ function P.to_messages(input)
 		end
 	end
 	push() -- flush last block
-	return msgs
+	return msgs, frontmatter
 end
 
 ---@param buf integer
@@ -153,7 +204,7 @@ function P.read_buf(buf)
 	return table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), "\n")
 end
 
-function P.open_new_chat_buffer(system_prompt)
+function P.open_new_chat_buffer(system_prompt, frontmatter)
 	vim.cmd("enew") -- new buffer, same window
 	local buf = vim.api.nvim_get_current_buf()
 
@@ -162,13 +213,19 @@ function P.open_new_chat_buffer(system_prompt)
 	-- vim.wo.foldmethod = "expr"
 	-- vim.wo.foldexpr = "v:lua.delphi_foldexpr(v:lnum)"
 
-	local lines = {
+	local lines = {}
+	if frontmatter then
+		vim.list_extend(lines, P.frontmatter_lines(frontmatter))
+		table.insert(lines, "")
+	end
+
+	vim.list_extend(lines, {
 		P.headers.system,
 		system_prompt or "",
 		"", -- spacer
 		P.headers.user,
 		"", -- where the user types
-	}
+	})
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
 
 	P.set_cursor_to_user(buf) -- jump to User prompt
@@ -505,12 +562,22 @@ local function filter_empty(tbl)
 	return ret
 end
 
+local function remove_frontmatter(tbl)
+	local fm, rest = parse_frontmatter(tbl)
+	if next(fm) then
+		return rest
+	end
+	return tbl
+end
+
 ---@param cur_lines string[]
 ---@param meta Metadata
 ---@return boolean
 function P.chat_invalidated(cur_lines, meta)
+	cur_lines = remove_frontmatter(cur_lines)
+	local stored = remove_frontmatter(meta.stored_lines or {})
 	local cur_lines_filtered = filter_empty(cur_lines)
-	local stored_filtered = filter_empty(meta.stored_lines or {})
+	local stored_filtered = filter_empty(stored)
 	if meta.invalid then
 		return true
 	end
