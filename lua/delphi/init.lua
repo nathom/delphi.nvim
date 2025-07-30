@@ -4,15 +4,20 @@ local P = require("delphi.primitives")
 ---@class Config
 ---@field models table<string, Model>
 ---@field allow_env_var_config boolean
----@field chat { system_prompt: string, default_model: string? }
+---@field chat { system_prompt: string, default_model: string?, headers: { system: string, user: string, assistant: string } }
 ---@field refactor { system_prompt: string, default_model: string?, prompt_template: string, accept_keymap: string, reject_keymap: string }
 local default_opts = {
 	models = {},
 	allow_env_var_config = false,
-	chat = {
-		system_prompt = "",
-		default_model = nil,
-	},
+        chat = {
+                system_prompt = "",
+                default_model = nil,
+                headers = {
+                        system = "System:",
+                        user = "User:",
+                        assistant = "Assistant:",
+                },
+        },
 	refactor = {
 		default_model = nil,
 		system_prompt = [[
@@ -88,9 +93,9 @@ local function setup_chat_cmd(config)
 			return vim.notify("The last message must be from the User!")
 		end
 
-		P.append_line_to_buf(buf, "")
-		P.append_line_to_buf(buf, "Assistant:")
-		P.append_line_to_buf(buf, "")
+                P.append_line_to_buf(buf, "")
+                P.append_line_to_buf(buf, P.headers.assistant)
+                P.append_line_to_buf(buf, "")
 
 		local default_model
 		if M.opts.allow_env_var_config and os.getenv("DELPHI_DEFAULT_CHAT_MODEL") then
@@ -109,9 +114,9 @@ local function setup_chat_cmd(config)
 		}, {
 			on_chunk = vim.schedule_wrap(function(chunk, is_done)
 				if is_done then
-					P.append_line_to_buf(buf, "")
-					P.append_line_to_buf(buf, "User: ")
-					P.append_line_to_buf(buf, "")
+                                        P.append_line_to_buf(buf, "")
+                                        P.append_line_to_buf(buf, P.headers.user .. " ")
+                                        P.append_line_to_buf(buf, "")
 					P.set_cursor_to_user(buf)
 					P.save_chat(buf)
 					return
@@ -215,8 +220,9 @@ function M.setup(opts)
 	for k, v in pairs(models) do
 		models[k] = Model.new(v)
 	end
-	M.opts = vim.tbl_deep_extend("force", M.opts, opts or {})
-	setup_chat_cmd(M.opts.chat)
+        M.opts = vim.tbl_deep_extend("force", M.opts, opts or {})
+        P.set_headers(M.opts.chat.headers)
+        setup_chat_cmd(M.opts.chat)
 	setup_refactor_cmd(M.opts.refactor)
 end
 
