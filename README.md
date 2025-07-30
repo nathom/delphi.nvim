@@ -20,6 +20,8 @@ These are the schema:
 ---@field refactor { system_prompt: string, default_model: string?, prompt_template: string, accept_keymap: string, reject_keymap: string }
 ```
 
+These are the default opts:
+
 ```lua
 opts = {
 	models = {},
