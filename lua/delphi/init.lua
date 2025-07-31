@@ -5,7 +5,7 @@ local P = require("delphi.primitives")
 ---@field models table<string, Model>
 ---@field allow_env_var_config boolean
 ---@field chat { system_prompt: string, default_model: string?, headers: { system: string, user: string, assistant: string } }
----@field rewrite { system_prompt: string, default_model: string?, prompt_template: string, accept_keymap: string, reject_keymap: string }
+---@field rewrite { system_prompt: string, default_model: string?, prompt_template: string, accept_keymap: string, reject_keymap: string, global_rewrite_keymap: string }
 local default_opts = {
 	models = {},
 	allow_env_var_config = false,
@@ -17,6 +17,7 @@ local default_opts = {
 			user = "User:",
 			assistant = "Assistant:",
 		},
+		send_keymap = "<leader><cr>",
 	},
 	rewrite = {
 		default_model = nil,
@@ -39,9 +40,21 @@ Selected lines ({{selection_start_lnum}}:{{selection_end_lnum}}):
 Instruction: {{user_instructions}}. Return ONLY the refactored code inside <delphi:refactored_code> tags. Preserve formatting unless told otherwise. Try to keep the diff minimal while following the instructions exactly.]],
 		accept_keymap = "<leader>a",
 		reject_keymap = "<leader>r",
+		global_rewrite_keymap = "<leader>r",
 	},
 }
 local M = { opts = default_opts }
+
+---Set chat send keymap
+---@param chat_keymap string
+---@param buf integer
+function M.apply_chat_keymaps(chat_keymap, buf)
+	local opts = { desc = "Send message", silent = true, buffer = buf }
+	vim.keymap.set({ "n", "i" }, chat_keymap, function()
+		-- TODO: make this use a lua function
+		vim.cmd([[Chat]])
+	end, opts)
+end
 
 local function get_delta(chunk)
 	if not chunk or not chunk.choices then
@@ -73,12 +86,22 @@ local function setup_chat_cmd(config)
 			if not entry then
 				return vim.notify("Chat not found")
 			end
-			P.open_chat_file(entry.path)
+			local b = P.open_chat_file(entry.path)
+			M.apply_chat_keymaps(config.send_keymap, b)
 			return
 		end
 
-		local buf = vim.api.nvim_get_current_buf()
-		if not vim.b.is_delphi_chat then
+		local orientation = nil
+		if args[1] == "split" or args[1] == "sp" then
+			orientation = "horizontal"
+		elseif args[1] == "vsplit" or args[1] == "vsp" then
+			orientation = "vertical"
+		end
+
+		local function create_chat()
+			if orientation then
+				P.new_split(orientation)
+			end
 			local default_model
 			if M.opts.allow_env_var_config and os.getenv("DELPHI_DEFAULT_CHAT_MODEL") then
 				default_model = os.getenv("DELPHI_DEFAULT_CHAT_MODEL")
@@ -86,12 +109,34 @@ local function setup_chat_cmd(config)
 				default_model = config.default_model
 			end
 			local model_cfg = M.opts.models[default_model] or {}
-			buf = P.open_new_chat_buffer(config.system_prompt, default_model, model_cfg.temperature)
+			local b = P.open_new_chat_buffer(config.system_prompt, default_model, model_cfg.temperature)
 			vim.b.is_delphi_chat = true
 			vim.b.delphi_chat_path = P.next_chat_path()
 			vim.b.delphi_meta_path = vim.b.delphi_chat_path:gsub("%.md$", "_meta.json")
-			P.save_chat(buf)
+			P.save_chat(b)
+			M.apply_chat_keymaps(config.send_keymap, b)
+			return b
+		end
+
+		local buf = vim.api.nvim_get_current_buf()
+		if args[1] == "new" or orientation then
+			create_chat()
 			return
+		elseif args[1] ~= nil then
+			vim.notify("delphi: Invalid Chat subcommand " .. tostring(args[1]), vim.log.levels.ERROR)
+			return
+		end
+
+		if not vim.b.is_delphi_chat then
+			local existing = P.find_chat_buffer()
+			if existing then
+				P.set_current_buf(existing)
+				P.set_cursor_to_user(existing)
+				return
+			else
+				create_chat()
+				return
+			end
 		end
 
 		local transcript = P.read_buf(buf)
@@ -240,13 +285,14 @@ end
 ---Setup delphi
 ---@param opts Config
 function M.setup(opts)
-	local models = opts.models
+	local models = opts.models or {}
 	local Model = require("delphi.model").Model
 	for k, v in pairs(models) do
 		models[k] = Model.new(v)
 	end
 
 	M.opts = vim.tbl_deep_extend("force", M.opts, opts or {})
+
 	P.set_headers(M.opts.chat.headers)
 	setup_chat_cmd(M.opts.chat)
 	setup_rewrite_cmd(M.opts.rewrite)
@@ -255,6 +301,7 @@ function M.setup(opts)
 	if ok then
 		cmp.register_source("delphi_path", require("delphi.cmp_source"))
 	end
+	vim.keymap.set("x", M.opts.rewrite.global_rewrite_keymap, ":Rewrite<cr>", { noremap = true, silent = true })
 end
 
 return M
