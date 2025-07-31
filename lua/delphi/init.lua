@@ -124,7 +124,10 @@ local function setup_chat_cmd(config)
 			vim.notify("Coudln't find model " .. tostring(default_model), vim.log.levels.ERROR)
 			return
 		end
-		openai.chat(model, {
+		if vim.b.delphi_chat_job and not vim.b.delphi_chat_job.is_closing then
+			vim.b.delphi_chat_job:shutdown()
+		end
+		vim.b.delphi_chat_job = openai.chat(model, {
 			stream = true,
 			messages = new_messages,
 		}, {
@@ -186,7 +189,10 @@ local function setup_refactor_cmd(config)
 				return
 			end
 
-			openai.chat(model, {
+			if vim.b.delphi_refactor_job and not vim.b.delphi_refactor_job.is_closing then
+				vim.b.delphi_refactor_job:shutdown()
+			end
+			vim.b.delphi_refactor_job = openai.chat(model, {
 				stream = true,
 				messages = {
 					{ role = "system", content = M.opts.refactor.system_prompt },
