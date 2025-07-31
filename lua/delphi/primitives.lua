@@ -248,6 +248,35 @@ function P.open_new_chat_buffer(system_prompt, model_name, temperature)
 	return buf
 end
 
+---Find the first loaded delphi chat buffer
+---@return integer|nil buf
+function P.find_chat_buffer()
+	for _, b in ipairs(vim.api.nvim_list_bufs()) do
+		if vim.api.nvim_buf_is_loaded(b) and vim.b[b].is_delphi_chat then
+			return b
+		end
+	end
+	return nil
+end
+
+---Create a new chat in a horizontal split
+---@param system_prompt string
+---@param model_name string
+---@param temperature number
+function P.split_new_chat(system_prompt, model_name, temperature)
+	vim.cmd("split")
+	return P.open_new_chat_buffer(system_prompt, model_name, temperature)
+end
+
+---Create a new chat in a vertical split
+---@param system_prompt string
+---@param model_name string
+---@param temperature number
+function P.vsplit_new_chat(system_prompt, model_name, temperature)
+	vim.cmd("vsplit")
+	return P.open_new_chat_buffer(system_prompt, model_name, temperature)
+end
+
 -- Persistent chat helpers ----------------------------------------------------
 
 ---Return directory for chat transcripts (created on demand)
