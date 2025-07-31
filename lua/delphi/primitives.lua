@@ -290,8 +290,37 @@ function P.open_chat_file(path)
 	vim.b.is_delphi_chat = true
 	vim.b.delphi_chat_path = path
 	vim.b.delphi_meta_path = path:gsub("%.md$", "_meta.json")
-	P.set_cursor_to_user(buf)
-	return buf
+        P.set_cursor_to_user(buf)
+        return buf
+end
+
+---Return the first loaded chat buffer, if any
+---@return integer|nil buf
+function P.find_chat_buffer()
+    for _, b in ipairs(vim.api.nvim_list_bufs()) do
+        if vim.api.nvim_buf_is_loaded(b) and vim.b[b].is_delphi_chat then
+            return b
+        end
+    end
+    return nil
+end
+
+---Create a new window split
+---@param dir 'horizontal'|'vertical'
+---@return integer win
+function P.new_split(dir)
+    if dir == 'vertical' then
+        vim.api.nvim_cmd({ cmd = 'vsplit' }, {})
+    else
+        vim.api.nvim_cmd({ cmd = 'split' }, {})
+    end
+    return vim.api.nvim_get_current_win()
+end
+
+---Focus the given buffer in the current window
+---@param buf integer
+function P.set_current_buf(buf)
+    vim.api.nvim_set_current_buf(buf)
 end
 
 ---Save a chat buffer to its associated path
