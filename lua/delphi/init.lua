@@ -91,10 +91,10 @@ local function setup_chat_cmd(config)
 			return
 		end
 
-		local orientation
-		if args[1] == "split" then
+		local orientation = nil
+		if args[1] == "split" or args[1] == "sp" then
 			orientation = "horizontal"
-		elseif args[1] == "vsplit" then
+		elseif args[1] == "vsplit" or args[1] == "vsp" then
 			orientation = "vertical"
 		end
 
@@ -121,6 +121,9 @@ local function setup_chat_cmd(config)
 		local buf = vim.api.nvim_get_current_buf()
 		if args[1] == "new" or orientation then
 			create_chat()
+			return
+		elseif args[1] ~= nil then
+			vim.notify("delphi: Invalid Chat subcommand " .. tostring(args[1]), vim.log.levels.ERROR)
 			return
 		end
 
