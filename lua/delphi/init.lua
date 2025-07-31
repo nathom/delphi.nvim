@@ -298,9 +298,7 @@ function M.setup(opts)
 	if ok then
 		cmp.register_source("delphi_path", require("delphi.cmp_source"))
 	end
-	vim.keymap.set("x", M.opts.rewrite.global_rewrite_keymap, function()
-		vim.cmd([[Rewrite]])
-	end)
+	vim.keymap.set("x", M.opts.rewrite.global_rewrite_keymap, ":Rewrite<cr>", { noremap = true, silent = true })
 end
 
 return M
