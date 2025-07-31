@@ -10,7 +10,8 @@ function M.chat(body, cb)
 	cb = cb or {}
 	local i, timer = 1, uv.new_timer()
 	local new_text = [[
-```
+<delphi:refactored_code>
+```python
 def fib(n: int, cache: dict[int, int] = defaultdict(int)):
     if n <= 1:
         return 1
@@ -18,6 +19,7 @@ def fib(n: int, cache: dict[int, int] = defaultdict(int)):
     cache[n] = ret
     return ret
 ```
+</delphi:refactored_code>
 ]]
 
 	local function tick()
