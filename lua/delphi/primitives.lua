@@ -37,6 +37,35 @@ function P.template(str, env)
 	)
 end
 
+---Create a fenced Markdown code block with the minimal fence length
+---@param content string
+---@param info string?
+---@return string
+function P.fenced_block(content, info)
+	local max = 0
+	for ticks in content:gmatch("`+") do
+		if #ticks > max then
+			max = #ticks
+		end
+	end
+	local fence = string.rep("`", max + 1)
+	local header = info and (#info > 0) and (fence .. info) or fence
+	return string.format("%s\n%s\n%s", header, content, fence)
+end
+
+---Return the maximum number of consecutive backticks in `str`
+---@param str string
+---@return integer
+function P.max_backticks(str)
+	local max = 0
+	for ticks in str:gmatch("`+") do
+		if #ticks > max then
+			max = #ticks
+		end
+	end
+	return max
+end
+
 local function starts_with(str, prefix)
 	return str:sub(1, #prefix) == prefix
 end
@@ -483,7 +512,8 @@ function P.resolve_tags(meta, messages)
 			table.insert(prompt_lines, "<tagged_files>")
 			for _, t in ipairs(tags_in_msg) do
 				local ext = t.path:match("%.([%w_]+)$") or ""
-				table.insert(prompt_lines, string.format("```%s %s\n%s\n```", ext, t.path, t.content))
+				local info = ext ~= "" and (ext .. " " .. t.path) or t.path
+				table.insert(prompt_lines, P.fenced_block(t.content, info))
 			end
 			table.insert(prompt_lines, "</tagged_files>")
 			table.insert(prompt_lines, msg.content)

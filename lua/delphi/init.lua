@@ -21,22 +21,16 @@ local default_opts = {
 	refactor = {
 		default_model = nil,
 		system_prompt = [[
-You are an expert refactoring assistant. Return ONLY the rewritten code in one fenced block:
-```
-...
-```.]],
+You are an expert refactoring assistant. Return ONLY the rewritten code in one fenced block. If the user specifies a fence length other than three, use exactly that many backticks.
+]],
 		prompt_template = [[
 Full file for context:
-```
-{{file_text}}
-```
+{{file_block}}
 
 Selected lines ({{selection_start_lnum}}:{{selection_end_lnum}}):
-```
-{{selected_text}}
-```
+{{selected_block}}
 
-Instruction: {{user_instructions}}. Return ONLY the refactored code within a code block. Preserve formatting unless told otherwise. Try to keep the diff minimal while following the instructions exactly.]],
+Instruction: {{user_instructions}}. Return ONLY the refactored code within a code block. If {{fence_len}} ~= 3, use exactly {{fence_len}} backticks for the fence. Preserve formatting unless told otherwise. Try to keep the diff minimal while following the instructions exactly.]],
 		accept_keymap = "<leader>a",
 		reject_keymap = "<leader>r",
 	},
@@ -168,10 +162,15 @@ local function setup_refactor_cmd(config)
 				selection_end_lnum = sel.end_lnum,
 				user_instructions = user_prompt,
 			}
+			env.file_block = P.fenced_block(env.file_text)
+			env.selected_block = P.fenced_block(env.selected_text)
+			local max_ticks = math.max(P.max_backticks(env.file_text), P.max_backticks(env.selected_text))
+			env.fence_len = max_ticks + 1
+			env.fence = string.rep("`", env.fence_len)
 
 			-- simple fence-aware streaming state
 			local Extractor = require("delphi.extractor").Extractor
-			local extractor = Extractor.new()
+			local extractor = Extractor.new(env.fence_len)
 
 			local diff = P.start_inline_diff(orig_buf, sel.start_lnum, sel.end_lnum, sel.lines)
 			local default_model
