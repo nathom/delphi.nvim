@@ -50,7 +50,7 @@ local M = { opts = default_opts }
 ---@param buf integer
 function M.apply_chat_keymaps(chat_keymap, buf)
 	local opts = { desc = "Send message", silent = true, buffer = buf }
-	vim.keymap.set({ "n", "i" }, chat_keymap, function()
+	vim.keymap.set({ "n" }, chat_keymap, function()
 		-- TODO: make this use a lua function
 		vim.cmd([[Chat]])
 	end, opts)
