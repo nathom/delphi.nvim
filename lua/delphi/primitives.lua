@@ -37,14 +37,24 @@ function P.template(str, env)
 	)
 end
 
+---Check whether a string starts with a given prefix.
+---@param str string
+---@param prefix string
+---@return boolean
 local function starts_with(str, prefix)
 	return str:sub(1, #prefix) == prefix
 end
 
+---Trim leading and trailing whitespace from a string.
+---@param s string
+---@return string
 local function strip(s)
 	return s:match("^%s*(.-)%s*$")
 end
 
+---Determine the role header of a chat line.
+---@param line string Line from the chat buffer.
+---@return "system"|"user"|"assistant"|nil role The detected role, or nil if no header is recognised.
 local function get_header(line)
 	local hdr = nil
 	if starts_with(line, P.headers.system) then
@@ -57,13 +67,15 @@ local function get_header(line)
 	return hdr
 end
 
--- frontmatter helpers --------------------------------------------------------
-
+---Parse YAML front-matter key/value pairs
+---@param lines string[] Buffer lines to scan
+---@return table<string,string|number> frontmatter  Flat table key → value
+---@return integer      end_index   Index **after** --- closing line (0 if none)
 local function parse_frontmatter_lines(lines)
 	if not lines[1] or lines[1] ~= "---" then
 		return {}, 0
 	end
-	local ret = {}
+	local ret = {} --[[@type table<string,string|number>]]
 	for i = 2, #lines do
 		local l = lines[i]
 		if l == "---" then
@@ -78,7 +90,10 @@ local function parse_frontmatter_lines(lines)
 	return ret, #lines
 end
 
-local function strip_frontmatter_lines(lines)
+---Remove leading (if any) front-matter delimited by ---
+---@param lines string[]
+---@return string[] lines Remaining lines **after** the closing ---
+function P.strip_frontmatter(lines)
 	local _, idx = parse_frontmatter_lines(lines)
 	if idx == 0 then
 		return lines
@@ -94,6 +109,9 @@ local function strip_frontmatter_lines(lines)
 	return res
 end
 
+---Read and parse YAML front-matter from a buffer or a ready-made list of lines
+---@param buf_or_lines integer|string[] Either buffer number (0 = current) or pre-read lines
+---@return table<string,string|number> frontmatter Flat table key → value
 function P.parse_frontmatter(buf_or_lines)
 	local lines
 	if type(buf_or_lines) == "table" then
@@ -104,10 +122,6 @@ function P.parse_frontmatter(buf_or_lines)
 	end
 	local fm = parse_frontmatter_lines(lines)
 	return fm
-end
-
-function P.strip_frontmatter(lines)
-	return strip_frontmatter_lines(lines)
 end
 
 function P.foldexpr(lnum)
