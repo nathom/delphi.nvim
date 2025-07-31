@@ -124,14 +124,11 @@ local function setup_chat_cmd(config)
 			vim.notify("Coudln't find model " .. tostring(default_model), vim.log.levels.ERROR)
 			return
 		end
-		if vim.b.delphi_chat_job and not vim.b.delphi_chat_job.is_closing then
-			vim.b.delphi_chat_job:shutdown()
-		end
-		vim.b.delphi_chat_job = openai.chat(model, {
+		openai.chat(model, {
 			stream = true,
 			messages = new_messages,
 		}, {
-			on_chunk = vim.schedule_wrap(function(chunk, is_done)
+			on_chunk = function(chunk, is_done)
 				if is_done then
 					P.append_line_to_buf(buf, "")
 					P.append_line_to_buf(buf, P.headers.user .. " ")
@@ -141,7 +138,7 @@ local function setup_chat_cmd(config)
 					return
 				end
 				P.append_chunk_to_buf(buf, get_delta(chunk))
-			end),
+			end,
 
 			on_error = vim.notify,
 		})
@@ -189,17 +186,14 @@ local function setup_refactor_cmd(config)
 				return
 			end
 
-			if vim.b.delphi_refactor_job and not vim.b.delphi_refactor_job.is_closing then
-				vim.b.delphi_refactor_job:shutdown()
-			end
-			vim.b.delphi_refactor_job = openai.chat(model, {
+			openai.chat(model, {
 				stream = true,
 				messages = {
 					{ role = "system", content = M.opts.refactor.system_prompt },
 					{ role = "user", content = P.template(M.opts.refactor.prompt_template, env) },
 				},
 			}, {
-				on_chunk = vim.schedule_wrap(function(chunk, is_done)
+				on_chunk = function(chunk, is_done)
 					if is_done then
 						local map = vim.keymap.set
 						map("n", config.accept_keymap, function()
@@ -224,7 +218,7 @@ local function setup_refactor_cmd(config)
 					if #new_code then
 						diff.push(new_code)
 					end
-				end),
+				end,
 
 				on_error = function() end,
 			})
