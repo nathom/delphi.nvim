@@ -17,7 +17,7 @@ These are the schema:
 ---@field models table<string, Model>
 ---@field allow_env_var_config boolean
 ---@field chat { system_prompt: string, default_model: string?, headers: { system: string, user: string, assistant: string } }
----@field refactor { system_prompt: string, default_model: string?, prompt_template: string, accept_keymap: string, reject_keymap: string }
+---@field rewrite { system_prompt: string, default_model: string?, prompt_template: string, accept_keymap: string, reject_keymap: string }
 ```
 
 These are the default opts:
@@ -35,7 +35,7 @@ opts = {
 			assistant = "Assistant:",
 		},
 	},
-	refactor = {
+	rewrite = {
 		default_model = nil,
 		system_prompt = [[
 You are an expert refactoring assistant. Return ONLY the rewritten code in one fenced block:

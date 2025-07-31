@@ -21,20 +21,20 @@ local default_opts = {
 	rewrite = {
 		default_model = nil,
 		system_prompt = [[
-You are an expert refactoring assistant. Respond with the rewritten code enclosed in <delphi:refactored_code> tags:
+You are an expert refactoring assistant. You ALWAYS respond with the rewritten code or text enclosed in <delphi:refactored_code> tags:
 <delphi:refactored_code>
 ...
 </delphi:refactored_code>]],
 		prompt_template = [[
 Full file for context:
-```
+<delphi:current_file>
 {{file_text}}
-```
+</delphi:current_file>
 
 Selected lines ({{selection_start_lnum}}:{{selection_end_lnum}}):
-```
+<delphi:selected_lines>
 {{selected_text}}
-```
+</delphi:selected_lines>
 
 Instruction: {{user_instructions}}. Return ONLY the refactored code inside <delphi:refactored_code> tags. Preserve formatting unless told otherwise. Try to keep the diff minimal while following the instructions exactly.]],
 		accept_keymap = "<leader>a",
