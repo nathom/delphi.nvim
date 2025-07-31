@@ -139,7 +139,7 @@ local function setup_chat_cmd(config)
 			messages = new_messages,
 			temperature = temperature,
 		}, {
-			on_chunk = vim.schedule_wrap(function(chunk, is_done)
+			on_chunk = function(chunk, is_done)
 				if is_done then
 					P.append_line_to_buf(buf, "")
 					P.append_line_to_buf(buf, P.headers.user .. " ")
@@ -149,7 +149,7 @@ local function setup_chat_cmd(config)
 					return
 				end
 				P.append_chunk_to_buf(buf, get_delta(chunk))
-			end),
+			end,
 
 			on_error = vim.notify,
 		})
@@ -204,7 +204,7 @@ local function setup_rewrite_cmd(config)
 					{ role = "user", content = P.template(M.opts.rewrite.prompt_template, env) },
 				},
 			}, {
-				on_chunk = vim.schedule_wrap(function(chunk, is_done)
+				on_chunk = function(chunk, is_done)
 					if is_done then
 						local map = vim.keymap.set
 						map("n", config.accept_keymap, function()
@@ -229,7 +229,7 @@ local function setup_rewrite_cmd(config)
 					if #new_code then
 						diff.push(new_code)
 					end
-				end),
+				end,
 
 				on_error = function() end,
 			})
