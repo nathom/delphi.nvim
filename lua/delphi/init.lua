@@ -5,8 +5,7 @@ local P = require("delphi.primitives")
 ---@field models table<string, Model>
 ---@field allow_env_var_config boolean
 ---@field chat { system_prompt: string, default_model: string?, headers: { system: string, user: string, assistant: string } }
----@field rewrite { system_prompt: string, default_model: string?, prompt_template: string, accept_keymap: string, reject_keymap: string }
----@field keys { chat: table, global: table }
+---@field rewrite { system_prompt: string, default_model: string?, prompt_template: string, accept_keymap: string, reject_keymap: string, global_rewrite_keymap: string }
 local default_opts = {
 	models = {},
 	allow_env_var_config = false,
@@ -18,9 +17,10 @@ local default_opts = {
 			user = "User:",
 			assistant = "Assistant:",
 		},
+		send_keymap = "<leader><cr>",
 	},
-        rewrite = {
-                default_model = nil,
+	rewrite = {
+		default_model = nil,
 		system_prompt = [[
 You are an expert refactoring assistant. Return ONLY the rewritten code in one fenced block:
 ```
@@ -39,35 +39,21 @@ Selected lines ({{selection_start_lnum}}:{{selection_end_lnum}}):
 
 Instruction: {{user_instructions}}. Return ONLY the refactored code within a code block. Preserve formatting unless told otherwise. Try to keep the diff minimal while following the instructions exactly.]],
 		accept_keymap = "<leader>a",
-                reject_keymap = "<leader>r",
-        },
-        keys = {
-                global = {
-                        x = { ["<leader>r"] = { cmd = "Rewrite", desc = "rewrite selection" } },
-                },
-                chat = {
-                        n = { ["<leader><CR>"] = { cmd = "Chat", desc = "send chat" } },
-                        i = { ["<leader><CR>"] = { cmd = "Chat", desc = "send chat" } },
-                },
-        },
+		reject_keymap = "<leader>r",
+		global_rewrite_keymap = "<leader>r",
+	},
 }
 local M = { opts = default_opts }
 
-local function apply_keymaps(maps, buf)
-        local ok, Keys = pcall(require, "lazy.core.handler")
-        Keys = ok and Keys.handlers.keys or nil
-        for mode, ms in pairs(maps) do
-                for lhs, spec in pairs(ms) do
-                        if spec and (not Keys or not Keys.active[Keys.parse({ lhs, mode = mode })]) then
-                                local opts = { desc = spec.desc, silent = true, buffer = buf }
-                                vim.keymap.set(mode, lhs, spec.cmd or spec, opts)
-                        end
-                end
-        end
-end
-
-function M.apply_chat_keymaps(buf)
-        apply_keymaps(M.opts.keys.chat, buf)
+---Set chat send keymap
+---@param chat_keymap string
+---@param buf integer
+function M.apply_chat_keymaps(chat_keymap, buf)
+	local opts = { desc = "Send message", silent = true, buffer = buf }
+	vim.keymap.set({ "n", "i" }, chat_keymap, function()
+		-- TODO: make this use a lua function
+		vim.cmd([[Chat]])
+	end, opts)
 end
 
 local function get_delta(chunk)
@@ -83,15 +69,15 @@ local function get_delta(chunk)
 end
 
 local function setup_chat_cmd(config)
-        vim.api.nvim_create_user_command("Chat", function(opts)
-                local args = opts.fargs
+	vim.api.nvim_create_user_command("Chat", function(opts)
+		local args = opts.fargs
 
-                if args[1] == "list" then
-                        for i, item in ipairs(P.list_chats()) do
-                                print(string.format("%d. %s", i - 1, item.preview))
-                        end
-                        return
-                elseif args[1] == "go" and args[2] then
+		if args[1] == "list" then
+			for i, item in ipairs(P.list_chats()) do
+				print(string.format("%d. %s", i - 1, item.preview))
+			end
+			return
+		elseif args[1] == "go" and args[2] then
 			local idx = tonumber(args[2])
 			if not idx then
 				return vim.notify("Invalid chat number")
@@ -100,56 +86,55 @@ local function setup_chat_cmd(config)
 			if not entry then
 				return vim.notify("Chat not found")
 			end
-                        local b = P.open_chat_file(entry.path)
-                        M.apply_chat_keymaps(b)
-                        return
-                end
+			local b = P.open_chat_file(entry.path)
+			M.apply_chat_keymaps(config.send_keymap, b)
+			return
+		end
 
-                local orientation
-                if args[1] == "split" then
-                        orientation = "horizontal"
-                elseif args[1] == "vsplit" then
-                        orientation = "vertical"
-                end
+		local orientation
+		if args[1] == "split" then
+			orientation = "horizontal"
+		elseif args[1] == "vsplit" then
+			orientation = "vertical"
+		end
 
-                local function create_chat()
-                        if orientation then
-                                P.new_split(orientation)
-                        end
-                        local default_model
-                        if M.opts.allow_env_var_config and os.getenv("DELPHI_DEFAULT_CHAT_MODEL") then
-                                default_model = os.getenv("DELPHI_DEFAULT_CHAT_MODEL")
-                        else
-                                default_model = config.default_model
-                        end
-                        local model_cfg = M.opts.models[default_model] or {}
-                        local b = P.open_new_chat_buffer(config.system_prompt, default_model, model_cfg.temperature)
-                        vim.b.is_delphi_chat = true
-                        vim.b.delphi_chat_path = P.next_chat_path()
-                        vim.b.delphi_meta_path = vim.b.delphi_chat_path:gsub("%.md$", "_meta.json")
-                        P.save_chat(b)
-                        M.apply_chat_keymaps(b)
-                        return b
-                end
+		local function create_chat()
+			if orientation then
+				P.new_split(orientation)
+			end
+			local default_model
+			if M.opts.allow_env_var_config and os.getenv("DELPHI_DEFAULT_CHAT_MODEL") then
+				default_model = os.getenv("DELPHI_DEFAULT_CHAT_MODEL")
+			else
+				default_model = config.default_model
+			end
+			local model_cfg = M.opts.models[default_model] or {}
+			local b = P.open_new_chat_buffer(config.system_prompt, default_model, model_cfg.temperature)
+			vim.b.is_delphi_chat = true
+			vim.b.delphi_chat_path = P.next_chat_path()
+			vim.b.delphi_meta_path = vim.b.delphi_chat_path:gsub("%.md$", "_meta.json")
+			P.save_chat(b)
+			M.apply_chat_keymaps(config.send_keymap, b)
+			return b
+		end
 
-                local buf = vim.api.nvim_get_current_buf()
-                if args[1] == "new" or orientation then
-                        create_chat()
-                        return
-                end
+		local buf = vim.api.nvim_get_current_buf()
+		if args[1] == "new" or orientation then
+			create_chat()
+			return
+		end
 
-                if not vim.b.is_delphi_chat then
-                        local existing = P.find_chat_buffer()
-                        if existing then
-                                P.set_current_buf(existing)
-                                M.apply_chat_keymaps(existing)
-                                P.set_cursor_to_user(existing)
-                                return
-                        else
-                                create_chat()
-                                return
-                        end
-                end
+		if not vim.b.is_delphi_chat then
+			local existing = P.find_chat_buffer()
+			if existing then
+				P.set_current_buf(existing)
+				P.set_cursor_to_user(existing)
+				return
+			else
+				create_chat()
+				return
+			end
+		end
 
 		local transcript = P.read_buf(buf)
 		local messages = P.to_messages(transcript)
@@ -297,38 +282,25 @@ end
 ---Setup delphi
 ---@param opts Config
 function M.setup(opts)
-        local models = opts.models or {}
-        local Model = require("delphi.model").Model
-        for k, v in pairs(models) do
-                models[k] = Model.new(v)
-        end
+	local models = opts.models or {}
+	local Model = require("delphi.model").Model
+	for k, v in pairs(models) do
+		models[k] = Model.new(v)
+	end
 
-        local keys = opts.keys or {}
-        keys.global = vim.tbl_deep_extend("force", default_opts.keys.global, keys.global or {})
-        keys.chat = vim.tbl_deep_extend("force", default_opts.keys.chat, keys.chat or {})
+	M.opts = vim.tbl_deep_extend("force", M.opts, opts or {})
 
-        opts.keys = nil
-
-        M.opts = vim.tbl_deep_extend("force", M.opts, opts or {})
-        M.opts.keys = keys
-
-        P.set_headers(M.opts.chat.headers)
-        setup_chat_cmd(M.opts.chat)
-        setup_rewrite_cmd(M.opts.rewrite)
-
-        apply_keymaps(M.opts.keys.global)
-        vim.api.nvim_create_autocmd("BufEnter", {
-                callback = function(ev)
-                        if vim.b[ev.buf].is_delphi_chat then
-                                M.apply_chat_keymaps(ev.buf)
-                        end
-                end,
-        })
+	P.set_headers(M.opts.chat.headers)
+	setup_chat_cmd(M.opts.chat)
+	setup_rewrite_cmd(M.opts.rewrite)
 
 	local ok, cmp = pcall(require, "cmp")
 	if ok then
 		cmp.register_source("delphi_path", require("delphi.cmp_source"))
 	end
+	vim.keymap.set("x", M.opts.rewrite.global_rewrite_keymap, function()
+		vim.cmd([[Rewrite]])
+	end)
 end
 
 return M
