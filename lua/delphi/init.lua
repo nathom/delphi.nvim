@@ -5,7 +5,7 @@ local P = require("delphi.primitives")
 ---@field models table<string, Model>
 ---@field allow_env_var_config boolean
 ---@field chat { system_prompt: string, default_model: string?, headers: { system: string, user: string, assistant: string } }
----@field refactor { system_prompt: string, default_model: string?, prompt_template: string, accept_keymap: string, reject_keymap: string }
+---@field rewrite { system_prompt: string, default_model: string?, prompt_template: string, accept_keymap: string, reject_keymap: string }
 local default_opts = {
 	models = {},
 	allow_env_var_config = false,
@@ -18,7 +18,7 @@ local default_opts = {
 			assistant = "Assistant:",
 		},
 	},
-	refactor = {
+	rewrite = {
 		default_model = nil,
 		system_prompt = [[
 You are an expert refactoring assistant. Return ONLY the rewritten code in one fenced block:
@@ -145,8 +145,8 @@ local function setup_chat_cmd(config)
 	end, { nargs = "*" })
 end
 
-local function setup_refactor_cmd(config)
-	vim.api.nvim_create_user_command("Refactor", function()
+local function setup_rewrite_cmd(config)
+	vim.api.nvim_create_user_command("Rewrite", function()
 		local orig_buf = vim.api.nvim_get_current_buf()
 		local sel = P.get_visual_selection(orig_buf)
 		if #sel.lines == 0 then
@@ -154,7 +154,7 @@ local function setup_refactor_cmd(config)
 		end
 		local file_lines = vim.api.nvim_buf_get_lines(orig_buf, 0, -1, false)
 
-		P.show_popup("Refactor prompt", function(user_prompt)
+		P.show_popup("Rewrite prompt", function(user_prompt)
 			vim.notify(user_prompt)
 			if user_prompt == "" then
 				vim.notify("Empty prompt")
@@ -175,8 +175,8 @@ local function setup_refactor_cmd(config)
 
 			local diff = P.start_inline_diff(orig_buf, sel.start_lnum, sel.end_lnum, sel.lines)
 			local default_model
-			if M.opts.allow_env_var_config and os.getenv("DELPHI_DEFAULT_REFACTOR_MODEL") then
-				default_model = os.getenv("DELPHI_DEFAULT_REFACTOR_MODEL")
+			if M.opts.allow_env_var_config and os.getenv("DELPHI_DEFAULT_REWRITE_MODEL") then
+				default_model = os.getenv("DELPHI_DEFAULT_REWRITE_MODEL")
 			else
 				default_model = config.default_model
 			end
@@ -189,8 +189,8 @@ local function setup_refactor_cmd(config)
 			openai.chat(model, {
 				stream = true,
 				messages = {
-					{ role = "system", content = M.opts.refactor.system_prompt },
-					{ role = "user", content = P.template(M.opts.refactor.prompt_template, env) },
+					{ role = "system", content = M.opts.rewrite.system_prompt },
+					{ role = "user", content = P.template(M.opts.rewrite.prompt_template, env) },
 				},
 			}, {
 				on_chunk = vim.schedule_wrap(function(chunk, is_done)
@@ -205,7 +205,7 @@ local function setup_refactor_cmd(config)
 							vim.notify("rejected")
 						end, { buffer = orig_buf })
 						vim.notify(
-							"Refactor finished – "
+							"Rewrite finished – "
 								.. config.accept_keymap
 								.. " accept "
 								.. config.reject_keymap
@@ -238,7 +238,7 @@ function M.setup(opts)
 	M.opts = vim.tbl_deep_extend("force", M.opts, opts or {})
 	P.set_headers(M.opts.chat.headers)
 	setup_chat_cmd(M.opts.chat)
-	setup_refactor_cmd(M.opts.refactor)
+	setup_rewrite_cmd(M.opts.rewrite)
 
 	local ok, cmp = pcall(require, "cmp")
 	if ok then
