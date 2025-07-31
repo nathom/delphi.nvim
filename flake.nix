@@ -57,7 +57,7 @@
                 opts = {
                   allow_env_var_config = true,
                   chat = { default_model = "gemini_flash" },
-                  refactor = { default_model = "gemini_flash" },
+                  rewrite = { default_model = "gemini_flash" },
                   models = {
                     gemini_flash = {
                       base_url = "https://openrouter.ai/api/v1", -- SET THIS UP
