@@ -109,7 +109,10 @@ The system prompt can usually be left empty, as the provider will set a reasonab
 
 #### Chat history
 
-The 
+You have two options:
+
+- Use `:Telescope delphi chats`
+- Run `:Chat list` to view the ids and titles of chats, and `:Chat go <id>` to open them
 
 ### Rewrite
 
