@@ -4,15 +4,17 @@ A tasteful LLM plugin.
 
 ## Features
 
-- Minimal, vim buffer based chat interface
-- Local storage for chat history
+- Clean and snappy Vim buffer based chat interface
+- Local storage for chat history, with [Telescope](https://github.com/nvim-telescope/telescope.nvim) integration
 - Code rewrite command with unified diff
-- All tokens are streamed in live
+- Live streaming of tokens
+- Pure Lua OpenAI client and diff algorithm
+
 
 ## Setup 
 
-You'll need a plugin manager (I recommend lazy.nvim), and an OpenAI compatible
-LLM API (I recommend openrouter).
+You'll need a plugin manager (such as [lazy](https://github.com/folke/lazy.nvim)), and an OpenAI compatible
+LLM API (such as [OpenRouter](https://openrouter.ai)).
 
 Example configuration with lazy.nvim:
 
@@ -35,16 +37,18 @@ Example configuration with lazy.nvim:
 			},
 		},
 	},
+	dependencies = { "nvim-lua/plenary.nvim" },
 }
 ```
+
+In this case, delphi will expect your OpenRouter API keys under the environment variable `OPENROUTER_API_KEY`.
 
 ## Usage
 
 ### Chat
 
-Type `:Chat` to open up a chat buffer. If there is already one open
-in your neovim instance, it will switch to that buffer. If you want to guarantee
-a new chat, use `:Chat new`.
+Type `:Chat` to open up a chat buffer. If one is already open
+in your Neovim instance, it will switch to that buffer. If you want to create a new chat regardless, use `:Chat new`.
 
 Example blank chat buffer:
 
@@ -103,6 +107,9 @@ Below is a practical “decision matrix” so you can decide whether the switch 
 
 The system prompt can usually be left empty, as the provider will set a reasonable one for you.
 
+#### Chat history
+
+The 
 
 ### Rewrite
 
