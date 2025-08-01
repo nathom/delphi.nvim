@@ -5,7 +5,7 @@ local P = require("delphi.primitives")
 ---@field models table<string, Model>
 ---@field allow_env_var_config boolean
 ---@field chat { system_prompt: string, default_model: string?, headers: { system: string, user: string, assistant: string } }
----@field rewrite { system_prompt: string, default_model: string?, prompt_template: string, accept_keymap: string, reject_keymap: string, global_rewrite_keymap: string }
+---@field rewrite { system_prompt: string, default_model: string?, prompt_template: string, accept_keymap: string, reject_keymap: string, global_rewrite_keymap: string? }
 local default_opts = {
 	models = {},
 	allow_env_var_config = false,
@@ -22,7 +22,7 @@ local default_opts = {
 	rewrite = {
 		default_model = nil,
 		system_prompt = [[
-You are an expert refactoring assistant. You ALWAYS respond with the rewritten code or text enclosed in <delphi:refactored_code> tags:
+You are Delphi, an expert refactoring assistant. You ALWAYS respond with the rewritten code or text enclosed in <delphi:refactored_code> tags:
 <delphi:refactored_code>
 ...
 </delphi:refactored_code>]],
@@ -301,7 +301,10 @@ function M.setup(opts)
 	if ok then
 		cmp.register_source("delphi_path", require("delphi.cmp_source"))
 	end
-	vim.keymap.set("x", M.opts.rewrite.global_rewrite_keymap, ":Rewrite<cr>", { noremap = true, silent = true })
+	local global_rewrite_keymap = M.opts.rewrite.global_rewrite_keymap
+	if global_rewrite_keymap then
+		vim.keymap.set("x", global_rewrite_keymap, ":Rewrite<cr>", { noremap = true, silent = true })
+	end
 end
 
 return M
