@@ -430,34 +430,37 @@ function P.show_popup(label, cb)
 	return win
 end
 
-local diff_ns = vim.api.nvim_create_namespace("delphi_inline_diff")
+local ghost_ns = vim.api.nvim_create_namespace("delphi_ghost_diff")
 
-function P.start_inline_diff(buf, start_lnum, end_lnum, left_lines)
+function P.start_ghost_diff(buf, start_lnum, end_lnum, left_lines)
 	local Differ = require("delphi.patience").Differ
 	local d = Differ:new()
 	local right_text = ""
-	local orig = vim.deepcopy(left_lines) -- for reject()
-	local cur_end = end_lnum
 
 	local function render(lines)
-		-- Replace current block with `lines`; extend/shrink as needed.
-		vim.api.nvim_buf_set_lines(buf, start_lnum - 1, cur_end, false, lines)
-		-- Clear & re-add extmarks
-		vim.api.nvim_buf_clear_namespace(buf, diff_ns, start_lnum - 1, start_lnum - 1 + #lines)
-		for i, l in ipairs(lines) do
+		-- There's probably a way to optimize this
+		vim.api.nvim_buf_clear_namespace(buf, ghost_ns, 0, -1)
+
+		local row = start_lnum - 1
+		for _, l in ipairs(lines) do
 			local tag = l:sub(1, 1)
-			if tag == "+" or tag == "-" then
-				local hl = (tag == "+") and "DiffAdd" or "DiffDelete"
-				vim.api.nvim_buf_set_extmark(
-					buf,
-					diff_ns,
-					start_lnum + i - 2,
-					0,
-					{ virt_text = { { l, hl } }, virt_text_pos = "overlay", hl_group = hl, invalidate = true }
-				)
+			local text = l:sub(3)
+			if tag == " " then
+				row = row + 1
+			elseif tag == "-" then
+				vim.api.nvim_buf_set_extmark(buf, ghost_ns, row, 0, {
+					virt_text = { { text, "DiffDelete" } },
+					virt_text_pos = "overlay",
+					hl_mode = "combine",
+				})
+				row = row + 1
+			elseif tag == "+" then
+				vim.api.nvim_buf_set_extmark(buf, ghost_ns, row, 0, {
+					virt_lines = { { { text, "DiffAdd" } } },
+					virt_lines_above = true,
+				})
 			end
 		end
-		cur_end = start_lnum + #lines - 1
 	end
 
 	return {
@@ -467,18 +470,13 @@ function P.start_inline_diff(buf, start_lnum, end_lnum, left_lines)
 			render(d:compare(left_lines, right_lines))
 		end,
 		accept = function()
-			vim.api.nvim_buf_set_lines(
-				buf,
-				start_lnum - 1,
-				cur_end,
-				false,
-				vim.split(right_text, "\n", { plain = true, trimempty = false })
-			)
-			vim.api.nvim_buf_clear_namespace(buf, diff_ns, start_lnum - 1, cur_end)
+			local lines = vim.split(right_text, "\n", { plain = true, trimempty = true })
+			pcall(vim.cmd, "undojoin")
+			vim.api.nvim_buf_set_lines(buf, start_lnum - 1, end_lnum, false, lines)
+			vim.api.nvim_buf_clear_namespace(buf, ghost_ns, 0, -1)
 		end,
 		reject = function()
-			vim.api.nvim_buf_set_lines(buf, start_lnum - 1, cur_end, false, orig)
-			vim.api.nvim_buf_clear_namespace(buf, diff_ns, start_lnum - 1, cur_end)
+			vim.api.nvim_buf_clear_namespace(buf, ghost_ns, 0, -1)
 		end,
 	}
 end

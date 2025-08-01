@@ -229,7 +229,7 @@ local function setup_rewrite_cmd(config)
 			local Extractor = require("delphi.extractor").Extractor
 			local extractor = Extractor.new()
 
-			local diff = P.start_inline_diff(orig_buf, sel.start_lnum, sel.end_lnum, sel.lines)
+			local diff = P.start_ghost_diff(orig_buf, sel.start_lnum, sel.end_lnum, sel.lines)
 			local default_model
 			if M.opts.allow_env_var_config and os.getenv("DELPHI_DEFAULT_REWRITE_MODEL") then
 				default_model = os.getenv("DELPHI_DEFAULT_REWRITE_MODEL")
