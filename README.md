@@ -99,7 +99,8 @@ Is it worth switching to Neovim?
 
 Assistant:
 Short answer  
-If you already know Vim and are happy with it, you probably don’t *need* to switch—but if you enjoy experimenting, want modern features without waiting for Bram to merge them, or are starting from scratch, Neovim is almost always the better choice today.
+If you already know Vim and are happy with it, you probably don’t *need* to switch—but if you enjoy experimenting,
+want modern features without waiting for Bram to merge them, or are starting from scratch, Neovim is almost always the better choice today.
 
 Below is a practical “decision matrix” so you can decide whether the switch is worth the one-time migration cost for *you*.
 ...
