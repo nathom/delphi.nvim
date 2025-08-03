@@ -1,5 +1,8 @@
 local P = {}
 
+local branch_ns = vim.api.nvim_create_namespace("delphi_branches")
+local graph_ns = vim.api.nvim_create_namespace("delphi_branch_graph")
+
 -- Header strings used in chat buffers
 P.headers = {
 	system = "System:",
@@ -245,6 +248,7 @@ function P.open_new_chat_buffer(system_prompt, model_name, temperature)
 
 	P.set_cursor_to_user(buf) -- jump to User prompt
 	vim.cmd("startinsert")
+	P.render_branch_graph(buf)
 	return buf
 end
 
@@ -290,6 +294,9 @@ function P.open_chat_file(path)
 	vim.b.is_delphi_chat = true
 	vim.b.delphi_chat_path = path
 	vim.b.delphi_meta_path = path:gsub("%.md$", "_meta.json")
+	local meta = P.read_chat_meta(path)
+	P.render_branch_links(buf, meta)
+	P.render_branch_graph(buf)
 	P.set_cursor_to_user(buf)
 	return buf
 end
@@ -491,7 +498,7 @@ function P.read_chat_meta(chat_path)
 	local meta_path = P.chat_meta_path(chat_path)
 	local ok, lines = pcall(vim.fn.readfile, meta_path)
 	if not ok then
-		return { tags = {}, stored_lines = {}, invalid = false }
+		return { tags = {}, stored_lines = {}, invalid = false, parent = nil, children = {} }
 	end
 	local ok2, decoded = pcall(vim.json.decode, table.concat(lines, "\n"), { luanil = { object = true, array = true } })
 	if not ok2 or type(decoded) ~= "table" then
@@ -500,6 +507,8 @@ function P.read_chat_meta(chat_path)
 	decoded.tags = decoded.tags or {}
 	decoded.stored_lines = decoded.stored_lines or {}
 	decoded.invalid = decoded.invalid or false
+	decoded.parent = decoded.parent
+	decoded.children = decoded.children or {}
 	return decoded
 end
 
@@ -514,6 +523,8 @@ function P.reset_meta(chat_path)
 		invalid = false,
 		stored_lines = {},
 		tags = {},
+		parent = nil,
+		children = {},
 	}
 	local meta_path = P.chat_meta_path(chat_path)
 	vim.fn.writefile({ vim.json.encode(blank_meta) }, meta_path)
@@ -542,10 +553,16 @@ function P.invalidate_meta(buf)
 	end, ns)
 end
 
+---@class BranchRef
+---@field path string
+---@field lnum integer
+
 ---@class Metadata
 ---@field stored_lines string[]
 ---@field tags table<string, string[]>
 ---@field invalid boolean
+---@field parent string|nil
+---@field children BranchRef[]
 
 ---@class Message
 ---@field role "system" | "user" | "assistant"
@@ -619,6 +636,262 @@ function P.chat_invalidated(cur_lines, meta)
 		end
 	end
 	return false
+end
+
+---Render branch links for a chat buffer
+---@param buf integer
+---@param meta Metadata
+function P.render_branch_links(buf, meta)
+	vim.api.nvim_buf_clear_namespace(buf, branch_ns, 0, -1)
+	if meta.parent then
+		local name = vim.fn.fnamemodify(meta.parent, ":t")
+		vim.api.nvim_buf_set_extmark(buf, branch_ns, 0, 0, {
+			virt_text = { { "← " .. name, "Comment" } },
+			virt_text_pos = "eol",
+		})
+	end
+	for _, child in ipairs(meta.children or {}) do
+		local name = vim.fn.fnamemodify(child.path, ":t")
+		vim.api.nvim_buf_set_extmark(buf, branch_ns, (child.lnum or 1) - 1, 0, {
+			virt_text = { { "↳ " .. name, "Comment" } },
+			virt_text_pos = "eol",
+		})
+	end
+end
+
+---Fork the current chat buffer at the cursor line
+---@param buf integer|nil
+---@return integer|nil new_buf
+function P.fork_chat(buf)
+	buf = buf or 0
+	local path = vim.b[buf].delphi_chat_path
+	if not path then
+		return nil
+	end
+	local lnum = vim.api.nvim_win_get_cursor(0)[1]
+	local lines = vim.api.nvim_buf_get_lines(buf, 0, lnum, false)
+	local child_path = P.next_chat_path()
+	vim.fn.writefile(lines, child_path)
+	local child_meta = P.read_chat_meta(child_path)
+	child_meta.parent = path
+	child_meta.stored_lines = lines
+	P.write_chat_meta(child_path, child_meta)
+	local meta = P.read_chat_meta(path)
+	meta.children = meta.children or {}
+	table.insert(meta.children, { path = child_path, lnum = lnum })
+	P.write_chat_meta(path, meta)
+	P.render_branch_links(buf, meta)
+	local new_buf = P.open_chat_file(child_path)
+	P.render_branch_links(new_buf, child_meta)
+	P.render_branch_graph(new_buf)
+	return new_buf
+end
+
+---Create a branch when chat history diverges
+---@param buf integer
+---@param meta Metadata
+---@return Metadata
+function P.retroactive_branch(buf, meta)
+	local path = vim.b[buf].delphi_chat_path
+	if not path then
+		return meta
+	end
+	local cur_lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+	vim.fn.writefile(meta.stored_lines or {}, path)
+	local max = math.min(#cur_lines, #meta.stored_lines)
+	local branch_lnum = max + 1
+	for i = 1, max do
+		if cur_lines[i] ~= meta.stored_lines[i] then
+			branch_lnum = i
+			break
+		end
+	end
+	local child_path = P.next_chat_path()
+	vim.fn.writefile(cur_lines, child_path)
+	meta.children = meta.children or {}
+	table.insert(meta.children, { path = child_path, lnum = branch_lnum })
+	P.write_chat_meta(path, meta)
+	local child_meta = P.read_chat_meta(child_path)
+	child_meta.parent = path
+	child_meta.stored_lines = cur_lines
+	P.write_chat_meta(child_path, child_meta)
+	vim.b[buf].delphi_chat_path = child_path
+	vim.b[buf].delphi_meta_path = P.chat_meta_path(child_path)
+	P.render_branch_links(buf, child_meta)
+	P.render_branch_graph(buf)
+	return child_meta
+end
+
+---Render an overview tree of all chats connected to the current one.
+---Nodes are labeled by their chat numbers and displayed at the top-right.
+---@param buf integer|nil
+function P.render_branch_graph(buf)
+	buf = buf or 0
+	local chat_path = vim.b[buf].delphi_chat_path
+	if not chat_path then
+		return
+	end
+
+	-- Extract the numeric chat id from a path like …/chat_42
+	local function chat_id(path)
+		local name = vim.fn.fnamemodify(path, ":t")
+		return tonumber(name:match("chat_(%d+)") or "0") or 0
+	end
+
+	-- Find ultimate root by walking parent links
+	local root = chat_path
+	while true do
+		local meta = P.read_chat_meta(root)
+		if not meta.parent then
+			break
+		end
+		root = meta.parent
+	end
+
+	---------------------------------------------------------------------------
+	-- The tree walker – direct translation of the Python algorithm
+	---------------------------------------------------------------------------
+	---@param path   string
+	---@param prefix string   -- leading run of "│ " or "  "
+	---@param tail   boolean  -- is this the last child of its parent?
+	---@param root   boolean  -- is this the real root?
+	---@param lines  string[] -- accumulator
+	local function walk(path, prefix, tail, is_root, lines)
+		local id = chat_id(path)
+		local child_pre
+		if is_root then -- root has no connector
+			table.insert(lines, tostring(id))
+			child_pre = ""
+		else
+			local conn = tail and "└─" or "├─"
+			table.insert(lines, prefix .. conn .. tostring(id))
+			child_pre = prefix .. (tail and "  " or "│ ")
+		end
+
+		local meta = P.read_chat_meta(path)
+		local children = meta.children or {}
+
+		for i, child in ipairs(children) do
+			walk(child.path, child_pre, i == #children, false, lines)
+		end
+	end
+
+	-- Build the string list
+	---@type string[]
+	local lines = {}
+	walk(root, "", false, true, lines)
+
+	-- Compute uniform width and pad to the right
+	local width = 0
+	for _, l in ipairs(lines) do
+		width = math.max(width, vim.fn.strdisplaywidth(l))
+	end
+	for i, l in ipairs(lines) do
+		lines[i] = l .. string.rep(" ", width - vim.fn.strdisplaywidth(l))
+	end
+
+	---------------------------------------------------------------------------
+	-- Emit as right-aligned virtual text
+	---------------------------------------------------------------------------
+	local line_count = vim.api.nvim_buf_line_count(buf)
+	vim.api.nvim_buf_clear_namespace(buf, graph_ns, 0, -1)
+
+	vim.api.nvim_buf_set_extmark(buf, graph_ns, 0, 0, {
+		virt_text = { { "Chat tree" .. string.rep(" ", width - vim.fn.strdisplaywidth("Chat tree")), "Comment" } },
+		virt_text_pos = "right_align",
+		hl_mode = "combine",
+	})
+	for i, l in ipairs(lines) do
+		local row = math.min(i - 1, line_count - 1) + 1
+		vim.api.nvim_buf_set_extmark(buf, graph_ns, row, 0, {
+			virt_text = { { l, "Comment" } },
+			virt_text_pos = "right_align",
+			hl_mode = "combine",
+		})
+	end
+end
+---Render an overview tree of all chats connected to the current one.
+---Nodes are labeled by their chat numbers and displayed at the top right.
+---@param buf integer|nil
+function P._render_branch_graph(buf)
+	buf = buf or 0
+	local chat_path = vim.b[buf].delphi_chat_path
+	if not chat_path then
+		return
+	end
+
+	---@param path string
+	---@return integer
+	local function chat_id(path)
+		local name = vim.fn.fnamemodify(path, ":t")
+		return tonumber(name:match("chat_(%d+)") or "0") or 0
+	end
+
+	---@param path string
+	---@param prefix string
+	---@param lines string[]
+	---@param is_first boolean
+	---@param is_last boolean
+	local function build_tree(path, prefix, lines, is_first, is_last)
+		local id = chat_id(path)
+		if prefix == "" then
+			table.insert(lines, tostring(id))
+		else
+			local branch = is_last and "└─" or "├─"
+			table.insert(lines, prefix .. branch .. tostring(id))
+		end
+		local meta = P.read_chat_meta(path)
+		local children = meta.children or {}
+
+		local child_prefix = prefix .. (is_first and " " or is_last and "  " or "│ ")
+
+		for i, child in ipairs(children) do
+			build_tree(child.path, child_prefix, lines, false, i == #children)
+		end
+	end
+
+	local root = chat_path
+	while true do
+		local meta = P.read_chat_meta(root)
+		if not meta.parent then
+			break
+		end
+		root = meta.parent
+	end
+
+	---@type string[]
+	local lines = {}
+	build_tree(root, "", lines, true, true)
+	-- print(vim.inspect(lines))
+
+	-- Find max display width
+	local max = 0
+	for _, l in ipairs(lines) do
+		max = math.max(max, vim.fn.strdisplaywidth(l))
+	end
+
+	-- Add virtual text with equal width
+	local line_count = vim.api.nvim_buf_line_count(buf)
+	for i, line in ipairs(lines) do
+		local pad = max - vim.fn.strdisplaywidth(line)
+		local padded = pad > 0 and (line .. string.rep(" ", pad)) or line
+		print('"' .. line .. '"', pad)
+		vim.api.nvim_buf_set_extmark(buf, graph_ns, math.min(i - 1, line_count - 1), 0, {
+			virt_text = { { padded, "Comment" } },
+			virt_text_pos = "right_align",
+			hl_mode = "combine",
+		})
+	end
+
+	-- vim.api.nvim_buf_clear_namespace(buf, graph_ns, 0, -1)
+	-- for i, line in ipairs(lines) do
+	-- 	local row = math.min(i - 1, math.max(0, line_count - 1))
+	-- 	vim.api.nvim_buf_set_extmark(buf, graph_ns, row, 0, {
+	-- 		virt_text = { { line, "Comment" } },
+	-- 		virt_text_pos = "eol",
+	-- 		hl_mode = "combine",
+	-- 	})
+	-- end
 end
 
 return P

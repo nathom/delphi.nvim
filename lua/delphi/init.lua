@@ -91,6 +91,17 @@ local function setup_chat_cmd(config)
 			return
 		end
 
+		if args[1] == "fork" then
+			if not vim.b.is_delphi_chat then
+				return vim.notify("Not in a chat buffer")
+			end
+			local new_buf = P.fork_chat(vim.api.nvim_get_current_buf())
+			if new_buf then
+				M.apply_chat_keymaps(config.send_keymap, new_buf)
+			end
+			return
+		end
+
 		local orientation = nil
 		if args[1] == "split" or args[1] == "sp" then
 			orientation = "horizontal"
@@ -146,9 +157,8 @@ local function setup_chat_cmd(config)
 		local cur_lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
 		local invalid = P.chat_invalidated(cur_lines, meta)
 		if invalid then
-			vim.notify("delphi: chat metadata file invalidated. resetting.", vim.log.levels.WARN)
-			P.reset_meta(vim.b.delphi_chat_path)
-			meta = P.read_chat_meta(vim.b.delphi_chat_path)
+			meta = P.retroactive_branch(buf, meta)
+			cur_lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
 		end
 
 		local last_role = (#messages > 0) and messages[#messages].role or ""
@@ -199,6 +209,13 @@ local function setup_chat_cmd(config)
 			on_error = vim.notify,
 		})
 	end, { nargs = "*" })
+end
+
+---@return nil
+local function setup_branch_graph_cmd()
+	vim.api.nvim_create_user_command("ChatForkGraph", function()
+		P.render_branch_graph(0)
+	end, {})
 end
 
 local function setup_rewrite_cmd(config)
@@ -296,6 +313,7 @@ function M.setup(opts)
 	P.set_headers(M.opts.chat.headers)
 	setup_chat_cmd(M.opts.chat)
 	setup_rewrite_cmd(M.opts.rewrite)
+	setup_branch_graph_cmd()
 
 	local ok, cmp = pcall(require, "cmp")
 	if ok then
