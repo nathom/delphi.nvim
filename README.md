@@ -23,7 +23,7 @@ Example configuration with lazy.nvim:
 	"nathom/delphi.nvim",
 	opts = {
 		chat = { default_model = "gemini_25" },
-		refactor = { default_model = "kimi_k2" },
+		rewrite = { default_model = "kimi_k2" },
 		models = {
 			gemini_25 = {
 				base_url = "https://openrouter.ai/api/v1",
