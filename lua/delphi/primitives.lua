@@ -167,6 +167,24 @@ function P.to_messages(input)
 	return msgs
 end
 
+---@param messages Message[]
+---@return string[]
+function P.messages_to_lines(messages)
+	local lines = {}
+	for i, msg in ipairs(messages or {}) do
+		local hdr = P.headers[msg.role]
+		if hdr then
+			table.insert(lines, hdr)
+			local body_lines = vim.split(msg.content or "", "\n", { plain = true, trimempty = false })
+			vim.list_extend(lines, body_lines)
+			if i < #messages then
+				table.insert(lines, "")
+			end
+		end
+	end
+	return lines
+end
+
 ---@param buf integer
 ---@param line string
 function P.append_line_to_buf(buf, line)
@@ -491,14 +509,20 @@ function P.read_chat_meta(chat_path)
 	local meta_path = P.chat_meta_path(chat_path)
 	local ok, lines = pcall(vim.fn.readfile, meta_path)
 	if not ok then
-		return { tags = {}, stored_lines = {}, invalid = false }
+		return { tags = {}, chat = {}, invalid = false }
 	end
 	local ok2, decoded = pcall(vim.json.decode, table.concat(lines, "\n"), { luanil = { object = true, array = true } })
 	if not ok2 or type(decoded) ~= "table" then
 		decoded = {}
 	end
 	decoded.tags = decoded.tags or {}
-	decoded.stored_lines = decoded.stored_lines or {}
+	if decoded.chat == nil then
+		if decoded.stored_lines then
+			decoded.chat = P.to_messages(table.concat(decoded.stored_lines, "\n"))
+		else
+			decoded.chat = {}
+		end
+	end
 	decoded.invalid = decoded.invalid or false
 	return decoded
 end
@@ -512,7 +536,7 @@ function P.reset_meta(chat_path)
 	---@class Metadata
 	local blank_meta = {
 		invalid = false,
-		stored_lines = {},
+		chat = {},
 		tags = {},
 	}
 	local meta_path = P.chat_meta_path(chat_path)
@@ -535,7 +559,7 @@ function P.invalidate_meta(buf)
 	vim.on_key(function(ch)
 		vim.on_key(nil, ns)
 		if ch == "u" then
-			vim.api.nvim_buf_set_lines(buf, 0, -1, false, meta.stored_lines or {})
+			vim.api.nvim_buf_set_lines(buf, 0, -1, false, P.messages_to_lines(meta.chat or {}))
 			meta.invalid = false
 			P.write_chat_meta(path, meta)
 		end
@@ -543,7 +567,7 @@ function P.invalidate_meta(buf)
 end
 
 ---@class Metadata
----@field stored_lines string[]
+---@field chat Message[]
 ---@field tags table<string, string[]>
 ---@field invalid boolean
 
@@ -609,7 +633,7 @@ end
 ---@return boolean
 function P.chat_invalidated(cur_lines, meta)
 	local cur_lines_filtered = filter_empty(P.strip_frontmatter(cur_lines))
-	local stored_filtered = filter_empty(P.strip_frontmatter(meta.stored_lines or {}))
+	local stored_filtered = filter_empty(P.strip_frontmatter(P.messages_to_lines(meta.chat or {})))
 	if meta.invalid then
 		return true
 	end
