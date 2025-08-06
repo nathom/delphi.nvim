@@ -20,6 +20,15 @@ function P.set_headers(hdrs)
 	end
 end
 
+---Set a keymap
+---@param modes string|string[]
+---@param lhs string
+---@param rhs string|fun()
+---@param opts table|nil
+function P.set_keymap(modes, lhs, rhs, opts)
+	vim.keymap.set(modes, lhs, rhs, opts)
+end
+
 ---Fill in a template string
 ---@param str string
 ---@param env table
