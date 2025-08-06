@@ -4,7 +4,7 @@ local P = require("delphi.primitives")
 ---@class Config
 ---@field models table<string, Model>
 ---@field allow_env_var_config boolean
----@field chat { system_prompt: string, default_model: string?, headers: { system: string, user: string, assistant: string } }
+---@field chat { system_prompt: string, default_model: string?, headers: { system: string, user: string, assistant: string }, send_keymap: string, grep_keymap: string? }
 ---@field rewrite { system_prompt: string, default_model: string?, prompt_template: string, accept_keymap: string, reject_keymap: string, global_rewrite_keymap: string? }
 local default_opts = {
 	models = {},
@@ -18,6 +18,7 @@ local default_opts = {
 			assistant = "Assistant:",
 		},
 		send_keymap = "<leader><cr>",
+		grep_keymap = "<leader>fc",
 	},
 	rewrite = {
 		default_model = nil,
@@ -50,7 +51,7 @@ local M = { opts = default_opts }
 ---@param buf integer
 function M.apply_chat_keymaps(chat_keymap, buf)
 	local opts = { desc = "Send message", silent = true, buffer = buf }
-	vim.keymap.set({ "n" }, chat_keymap, function()
+	P.set_keymap({ "n" }, chat_keymap, function()
 		-- TODO: make this use a lua function
 		vim.cmd([[Chat]])
 	end, opts)
@@ -300,6 +301,20 @@ function M.setup(opts)
 	local ok, cmp = pcall(require, "cmp")
 	if ok then
 		cmp.register_source("delphi_path", require("delphi.cmp_source"))
+	end
+	local grep_keymap = M.opts.chat.grep_keymap
+	if grep_keymap then
+		P.set_keymap("n", grep_keymap, function()
+			local ok_telescope, telescope = pcall(require, "telescope")
+			if not ok_telescope then
+				vim.notify("delphi: telescope not available", vim.log.levels.ERROR)
+				return
+			end
+			if not telescope.extensions or not telescope.extensions.delphi then
+				telescope.load_extension("delphi")
+			end
+			telescope.extensions.delphi.grep_chats()
+		end, { noremap = true, silent = true, desc = "Search chats" })
 	end
 	local global_rewrite_keymap = M.opts.rewrite.global_rewrite_keymap
 	if global_rewrite_keymap then
