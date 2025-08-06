@@ -337,7 +337,7 @@ function P.save_chat(buf, path)
 end
 
 ---List available chats
----@return { path:string, preview:string }[]
+---@return { path:string, preview:string, text:string }[]
 function P.list_chats()
 	local dir = P.chat_data_dir()
 	local files = vim.fn.readdir(dir)
@@ -366,7 +366,7 @@ function P.list_chats()
 				if #preview > 40 then
 					preview = preview:sub(1, 37) .. "..."
 				end
-				table.insert(res, { path = p, preview = preview })
+				table.insert(res, { path = p, preview = preview, text = text })
 			end
 		end
 	end

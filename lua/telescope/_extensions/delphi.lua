@@ -22,7 +22,7 @@ function M.chats(opts)
 					return {
 						value = item.path,
 						display = item.preview,
-						ordinal = item.preview,
+						ordinal = item.text,
 					}
 				end,
 			}),
