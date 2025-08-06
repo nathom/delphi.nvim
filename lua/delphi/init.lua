@@ -157,7 +157,7 @@ local function setup_chat_cmd(config)
 		end
 
 		local new_meta, new_messages = P.resolve_tags(meta, messages)
-		new_meta.stored_lines = cur_lines
+		new_meta.chat = new_messages
 
 		P.write_chat_meta(vim.b.delphi_chat_path, new_meta)
 
