@@ -37,7 +37,10 @@ Selected lines ({{selection_start_lnum}}:{{selection_end_lnum}}):
 {{selected_text}}
 </delphi:selected_lines>
 
-Instruction: {{user_instructions}}. Return ONLY the refactored code inside <delphi:refactored_code> tags. Preserve formatting unless told otherwise. Try to keep the diff minimal while following the instructions exactly.]],
+First, think step by step about the context and the best way to rewrite the selected lines in your scratchpad in between <delphi:think></delphi:think> tags. Then write the answer in between <delphi:refactored_code></delphi:refactored_code> tags.
+
+Rewrite the selected lines according to the following instructions: {{user_instructions}}
+]],
 		accept_keymap = "<leader>a",
 		reject_keymap = "<leader>r",
 		global_rewrite_keymap = "<leader>r",
