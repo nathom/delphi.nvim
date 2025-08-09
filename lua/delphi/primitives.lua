@@ -481,6 +481,86 @@ function P.start_ghost_diff(buf, start_lnum, end_lnum, left_lines)
 	}
 end
 
+---Prefix lines with `"<lnum> | "` for LLM reference.
+---@param lines string[]
+---@param start_lnum integer|nil  -- 1-based starting line number
+---@return string[]
+function P.add_line_numbers(lines, start_lnum)
+	local out = {}
+	local n = start_lnum or 1
+	for i = 1, #lines do
+		out[i] = string.format("%d | %s", n, lines[i])
+		n = n + 1
+	end
+	return out
+end
+
+---Start a streaming udiff preview for the entire buffer.
+---@param buf integer
+---@param base_lines string[]
+---@return table  -- { push = fun(tok:string), accept = fun(), reject = fun() }
+function P.start_udiff_preview(buf, base_lines)
+	local U = require("delphi.udiff").new
+	local patcher = U(base_lines)
+	local last_patched = nil --[[@type string[]|nil]]
+
+	local function render_ops(ops)
+		vim.api.nvim_buf_clear_namespace(buf, ghost_ns, 0, -1)
+		local line_count = vim.api.nvim_buf_line_count(buf)
+		local clamp = function(row)
+			if line_count == 0 then
+				return 0
+			end
+			local maxrow = math.max(0, line_count - 1)
+			if row < 0 then
+				return 0
+			elseif row > maxrow then
+				return maxrow
+			else
+				return row
+			end
+		end
+		for _, op in ipairs(ops) do
+			local row = clamp(op.row)
+			if op.kind == "del" then
+				vim.api.nvim_buf_set_extmark(buf, ghost_ns, row, 0, {
+					virt_text = { { op.text, "DiffDelete" } },
+					virt_text_pos = "overlay",
+					hl_mode = "combine",
+				})
+			elseif op.kind == "add" then
+				vim.api.nvim_buf_set_extmark(buf, ghost_ns, row, 0, {
+					virt_lines = { { { op.text, "DiffAdd" } } },
+					virt_lines_above = true,
+				})
+			end
+		end
+	end
+
+	return {
+		push = function(tok)
+			patcher:push(tok)
+			local patched = patcher:apply_partial()
+			if patched ~= nil then
+				last_patched = patched
+				local ops = patcher:overlay_ops()
+				if ops and #ops > 0 then
+					render_ops(ops)
+				end
+			end
+		end,
+		accept = function()
+			local patched = last_patched or base_lines
+			pcall(vim.cmd, "undojoin")
+			vim.api.nvim_buf_set_lines(buf, 0, -1, false, patched)
+			vim.api.nvim_buf_clear_namespace(buf, ghost_ns, 0, -1)
+		end,
+		reject = function()
+			vim.api.nvim_buf_clear_namespace(buf, ghost_ns, 0, -1)
+		end,
+	}
+end
+
 -- chat metadata helpers ------------------------------------------------------
 
 function P.chat_meta_path(chat_path)

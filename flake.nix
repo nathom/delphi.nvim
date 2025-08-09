@@ -20,6 +20,8 @@
           vimPlugins.telescope-nvim
           vimPlugins.nvim-cmp
           vimPlugins.cmp-path
+          lua
+          luaPackages.busted
           git
           curl
           jq
@@ -56,13 +58,13 @@
                 dependencies = { "nvim-lua/plenary.nvim", "nvim-telescope/telescope.nvim", "hrsh7th/nvim-cmp", "hrsh7th/cmp-path"},
                 opts = {
                   allow_env_var_config = true,
-                  chat = { default_model = "gemini_flash" },
-                  rewrite = { default_model = "gemini_flash" },
+                  chat = { default_model = "kimi" },
+                  rewrite = { default_model = "kimi" },
                   models = {
-                    gemini_flash = {
-                      base_url = "https://openrouter.ai/api/v1", -- SET THIS UP
-                      api_key_env_var = "OPENROUTER_API_KEY", -- SET THIS UP
-                      model_name = "google/gemini-2.5-flash",
+                    kimi = {
+                      base_url = "https://openrouter.ai/api/v1",
+                      api_key_env_var = "OPENROUTER_API_KEY",
+                      model_name = "moonshotai/kimi-k2",
                     }
                   }
                 },
