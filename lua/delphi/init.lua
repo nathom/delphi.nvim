@@ -22,22 +22,28 @@ local default_opts = {
 	rewrite = {
 		default_model = nil,
 		system_prompt = [[
-You are Delphi, an expert refactoring assistant. You ALWAYS respond with the rewritten code or text enclosed in <delphi:refactored_code> tags:
-<delphi:refactored_code>
-...
-</delphi:refactored_code>]],
+You are Delphi, an expert refactoring assistant. Produce a unified diff (udiff) for the current file only, enclosed strictly in <delphi:refactored_code> tags. Use the provided line numbers ("N | ") only as reference for computing hunk positions. Do NOT include the "N | " prefixes in the diff body; the diff must apply to the original file contents. Return only the udiff inside the tags; no commentary or extra text.]],
 		prompt_template = [[
-Full file for context:
+Full file (numbered for reference):
 <delphi:current_file>
 {{file_text}}
 </delphi:current_file>
 
-Selected lines ({{selection_start_lnum}}:{{selection_end_lnum}}):
+Selected lines {{selection_start_lnum}}:{{selection_end_lnum}} (numbered for reference):
 <delphi:selected_lines>
 {{selected_text}}
 </delphi:selected_lines>
 
-Instruction: {{user_instructions}}. Return ONLY the refactored code inside <delphi:refactored_code> tags. Preserve formatting unless told otherwise. Try to keep the diff minimal while following the instructions exactly.]],
+Instruction: {{user_instructions}}
+
+Strict output format:
+<delphi:refactored_code>
+@@ -<orig_start>,<orig_count> +<new_start>,<new_count> @@
+  <context line>
+- <removed line>
++ <added line>
+... (repeat hunks as needed)
+</delphi:refactored_code>]],
 		accept_keymap = "<leader>a",
 		reject_keymap = "<leader>r",
 		global_rewrite_keymap = "<leader>r",
@@ -218,8 +224,8 @@ local function setup_rewrite_cmd(config)
 			end -- cancelled
 
 			local env = {
-				file_text = table.concat(file_lines, "\n"),
-				selected_text = table.concat(sel.lines, "\n"),
+				file_text = table.concat(P.add_line_numbers(file_lines, 1), "\n"),
+				selected_text = table.concat(P.add_line_numbers(sel.lines, sel.start_lnum), "\n"),
 				selection_start_lnum = sel.start_lnum,
 				selection_end_lnum = sel.end_lnum,
 				user_instructions = user_prompt,
@@ -229,7 +235,7 @@ local function setup_rewrite_cmd(config)
 			local Extractor = require("delphi.extractor").Extractor
 			local extractor = Extractor.new()
 
-			local diff = P.start_ghost_diff(orig_buf, sel.start_lnum, sel.end_lnum, sel.lines)
+			local diff = P.start_udiff_preview(orig_buf, file_lines)
 			local default_model
 			if M.opts.allow_env_var_config and os.getenv("DELPHI_DEFAULT_REWRITE_MODEL") then
 				default_model = os.getenv("DELPHI_DEFAULT_REWRITE_MODEL")
