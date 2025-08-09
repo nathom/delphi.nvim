@@ -20,11 +20,18 @@ Example configuration with lazy.nvim:
 
 ```lua
 {
-	"nathom/delphi.nvim",
-	opts = {
-		chat = { default_model = "gemini_25" },
-		rewrite = { default_model = "kimi_k2" },
-		models = {
+        "nathom/delphi.nvim",
+        keys = {
+                { "<leader><cr>", "<Plug>(DelphiChatSend)", desc = "Delphi: send chat" },
+                { "<leader>r", "<Plug>(DelphiRewriteSelection)", mode = "x", desc = "Delphi: rewrite selection" },
+                { "<leader>a", "<Plug>(DelphiRewriteAccept)", desc = "Delphi: accept rewrite" },
+                { "<leader>R", "<Plug>(DelphiRewriteReject)", desc = "Delphi: reject rewrite" },
+                { "<Esc><Esc>", "<Plug>(DelphiPromptCancel)", mode = { "n", "i" }, desc = "Delphi: cancel prompt" },
+        },
+        opts = {
+                chat = { default_model = "gemini_25" },
+                rewrite = { default_model = "kimi_k2" },
+                models = {
 			gemini_25 = {
 				base_url = "https://openrouter.ai/api/v1",
 				api_key_env_var = "OPENROUTER_API_KEY",
@@ -66,8 +73,7 @@ User:
 
 ```
 
-To send a message to the model, type text below `User:`, switch to normal mode, and hit
-`<leader><ENTER>`. 
+To send a message to the model, type text below `User:`, switch to normal mode, and trigger `<Plug>(DelphiChatSend)`.
 
 
 ```md
@@ -125,9 +131,9 @@ To use it
 
 - open a buffer with some text
 - highlight a few lines in Visual Lines mode (shift-V)
-- hit `<leader>r`, which should open a popup
+- trigger `<Plug>(DelphiRewriteSelection)`, which should open a popup
 - instruct the model, hit `ENTER`
-- accept or reject the changes
+- accept or reject the changes via `<Plug>(DelphiRewriteAccept)` or `<Plug>(DelphiRewriteReject)`
 
 ### Configuration
 
@@ -144,7 +150,7 @@ These are the schema:
 ---@field models table<string, Model>
 ---@field allow_env_var_config boolean
 ---@field chat { system_prompt: string, default_model: string?, headers: { system: string, user: string, assistant: string } }
----@field rewrite { system_prompt: string, default_model: string?, prompt_template: string, accept_keymap: string, reject_keymap: string, global_rewrite_keymap: string? }
+---@field rewrite { system_prompt: string, default_model: string?, prompt_template: string }
 ```
 
 These are the default opts:
@@ -153,24 +159,23 @@ These are the default opts:
 opts = {
 	models = {},
 	allow_env_var_config = false,
-	chat = {
-		system_prompt = "",
-		default_model = nil,
-		headers = {
-			system = "System:",
-			user = "User:",
-			assistant = "Assistant:",
-		},
-		send_keymap = "<leader><cr>",
-	},
-	rewrite = {
-		default_model = nil,
-		system_prompt = [[
+        chat = {
+                system_prompt = "",
+                default_model = nil,
+                headers = {
+                        system = "System:",
+                        user = "User:",
+                        assistant = "Assistant:",
+                },
+        },
+        rewrite = {
+                default_model = nil,
+                system_prompt = [[
 You are an expert refactoring assistant. You ALWAYS respond with the rewritten code or text enclosed in <delphi:refactored_code> tags:
 <delphi:refactored_code>
 ...
 </delphi:refactored_code>]],
-		prompt_template = [[
+                prompt_template = [[
 Full file for context:
 <delphi:current_file>
 {{file_text}}
@@ -182,9 +187,6 @@ Selected lines ({{selection_start_lnum}}:{{selection_end_lnum}}):
 </delphi:selected_lines>
 
 Instruction: {{user_instructions}}. Return ONLY the refactored code inside <delphi:refactored_code> tags. Preserve formatting unless told otherwise. Try to keep the diff minimal while following the instructions exactly.]],
-		accept_keymap = "<leader>a",
-		reject_keymap = "<leader>r",
-		global_rewrite_keymap = "<leader>r",
-	},
+        },
 }
 ```
