@@ -243,6 +243,13 @@ local function setup_rewrite_cmd(config)
 				vim.notify("Coudln't find model " .. tostring(default_model), vim.log.levels.ERROR)
 				return
 			end
+			local think_spinner = require("delphi.spinner").new({
+				bufnr = vim.api.nvim_get_current_buf(),
+				autohide_on_stop = true,
+				row = sel.start_lnum,
+				label = "Thinking",
+			})
+			think_spinner:start()
 
 			openai.chat(model, {
 				stream = true,
@@ -274,6 +281,9 @@ local function setup_rewrite_cmd(config)
 					end
 					local new_code = extractor:update(get_delta(chunk))
 					if #new_code then
+						if think_spinner then
+							think_spinner:stop()
+						end
 						diff.push(new_code)
 					end
 				end,

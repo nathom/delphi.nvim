@@ -422,6 +422,12 @@ function P.show_popup(label, cb)
 			vim.cmd("startinsert!")
 		end
 	end)
+	vim.keymap.set(
+		{ "n", "i" },
+		"<ESC><ESC>",
+		"<Plug>(DelphiPromptCancel)",
+		{ buffer = buf, noremap = true, silent = true, desc = "Delphi: cancel prompt" }
+	)
 	vim.keymap.set({ "n", "i" }, "<Plug>(DelphiPromptCancel)", function()
 		vim.api.nvim_win_close(win, true)
 		cb("")
@@ -451,13 +457,13 @@ function P.start_ghost_diff(buf, start_lnum, end_lnum, left_lines)
 				vim.api.nvim_buf_set_extmark(buf, ghost_ns, row, 0, {
 					virt_text = { { text, "DiffDelete" } },
 					virt_text_pos = "overlay",
-					hl_mode = "combine",
+					-- hl_mode = "combine",
 				})
 				row = row + 1
 			elseif tag == "+" then
 				vim.api.nvim_buf_set_extmark(buf, ghost_ns, row, 0, {
 					virt_lines = { { { text, "DiffAdd" } } },
-					virt_lines_above = true,
+					virt_lines_above = false,
 				})
 			end
 		end
