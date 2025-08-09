@@ -422,10 +422,10 @@ function P.show_popup(label, cb)
 			vim.cmd("startinsert!")
 		end
 	end)
-	vim.keymap.set({ "n", "i" }, "<Esc><Esc>", function()
+	vim.keymap.set({ "n", "i" }, "<Plug>(DelphiPromptCancel)", function()
 		vim.api.nvim_win_close(win, true)
 		cb("")
-	end, { buffer = buf, noremap = true, silent = true })
+	end, { buffer = buf, noremap = true, silent = true, desc = "Delphi: cancel prompt" })
 
 	return win
 end
