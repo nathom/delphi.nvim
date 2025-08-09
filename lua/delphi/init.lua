@@ -5,7 +5,7 @@ local P = require("delphi.primitives")
 ---@field models table<string, Model>
 ---@field allow_env_var_config boolean
 ---@field chat { system_prompt: string, default_model: string?, headers: { system: string, user: string, assistant: string } }
----@field rewrite { system_prompt: string, default_model: string?, prompt_template: string, accept_keymap: string, reject_keymap: string, global_rewrite_keymap: string? }
+---@field rewrite { system_prompt: string, default_model: string?, prompt_template: string }
 local default_opts = {
 	models = {},
 	allow_env_var_config = false,
@@ -17,7 +17,6 @@ local default_opts = {
 			user = "User:",
 			assistant = "Assistant:",
 		},
-		send_keymap = "<leader><cr>",
 	},
 	rewrite = {
 		default_model = nil,
@@ -37,6 +36,7 @@ Selected lines ({{selection_start_lnum}}:{{selection_end_lnum}}):
 {{selected_text}}
 </delphi:selected_lines>
 
+
 First, think step by step about the context and the best way to rewrite the selected lines in your scratchpad in between <delphi:think></delphi:think> tags. Then write the answer in between <delphi:refactored_code></delphi:refactored_code> tags.
 
 Rewrite the selected lines according to the following instructions: {{user_instructions}}
@@ -49,12 +49,10 @@ Rewrite the selected lines according to the following instructions: {{user_instr
 local M = { opts = default_opts }
 
 ---Set chat send keymap
----@param chat_keymap string
 ---@param buf integer
-function M.apply_chat_keymaps(chat_keymap, buf)
-	local opts = { desc = "Send message", silent = true, buffer = buf }
-	vim.keymap.set({ "n" }, chat_keymap, function()
-		-- TODO: make this use a lua function
+function M.apply_chat_keymaps(buf)
+	local opts = { desc = "Delphi: send message", silent = true, buffer = buf }
+	vim.keymap.set("n", "<Plug>(DelphiChatSend)", function()
 		vim.cmd([[Chat]])
 	end, opts)
 end
@@ -90,7 +88,7 @@ local function setup_chat_cmd(config)
 				return vim.notify("Chat not found")
 			end
 			local b = P.open_chat_file(entry.path)
-			M.apply_chat_keymaps(config.send_keymap, b)
+			M.apply_chat_keymaps(b)
 			return
 		end
 
@@ -117,7 +115,7 @@ local function setup_chat_cmd(config)
 			vim.b.delphi_chat_path = P.next_chat_path()
 			vim.b.delphi_meta_path = vim.b.delphi_chat_path:gsub("%.md$", "_meta.json")
 			P.save_chat(b)
-			M.apply_chat_keymaps(config.send_keymap, b)
+			M.apply_chat_keymaps(b)
 			return b
 		end
 
@@ -135,6 +133,7 @@ local function setup_chat_cmd(config)
 			if existing then
 				P.set_current_buf(existing)
 				P.set_cursor_to_user(existing)
+				M.apply_chat_keymaps(existing)
 				return
 			else
 				create_chat()
@@ -255,22 +254,22 @@ local function setup_rewrite_cmd(config)
 				on_chunk = function(chunk, is_done)
 					if is_done then
 						local map = vim.keymap.set
-						map("n", config.accept_keymap, function()
+						map("n", "<Plug>(DelphiRewriteAccept)", function()
 							diff.accept()
 							vim.notify("applied")
-						end, { buffer = orig_buf })
-						map("n", config.reject_keymap, function()
+						end, {
+							buffer = orig_buf,
+							desc = "Delphi: accept rewrite",
+							silent = true,
+						})
+						map("n", "<Plug>(DelphiRewriteReject)", function()
 							diff.reject()
 							vim.notify("rejected")
-						end, { buffer = orig_buf })
-						vim.notify(
-							"Rewrite finished – "
-								.. config.accept_keymap
-								.. " accept "
-								.. config.reject_keymap
-								.. " reject",
-							vim.log.levels.INFO
-						)
+						end, {
+							buffer = orig_buf,
+							desc = "Delphi: reject rewrite",
+							silent = true,
+						})
 						return
 					end
 					local new_code = extractor:update(get_delta(chunk))
@@ -283,6 +282,12 @@ local function setup_rewrite_cmd(config)
 			})
 		end)
 	end, { range = true, desc = "LLM-rewrite the current visual selection" })
+	vim.keymap.set(
+		"x",
+		"<Plug>(DelphiRewriteSelection)",
+		":Rewrite<cr>",
+		{ desc = "Delphi: rewrite selection", silent = true }
+	)
 end
 
 ---Setup delphi
@@ -303,10 +308,6 @@ function M.setup(opts)
 	local ok, cmp = pcall(require, "cmp")
 	if ok then
 		cmp.register_source("delphi_path", require("delphi.cmp_source"))
-	end
-	local global_rewrite_keymap = M.opts.rewrite.global_rewrite_keymap
-	if global_rewrite_keymap then
-		vim.keymap.set("x", global_rewrite_keymap, ":Rewrite<cr>", { noremap = true, silent = true })
 	end
 end
 

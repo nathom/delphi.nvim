@@ -337,7 +337,7 @@ function P.save_chat(buf, path)
 end
 
 ---List available chats
----@return { path:string, preview:string }[]
+---@return { path:string, preview:string, text:string }[]
 function P.list_chats()
 	local dir = P.chat_data_dir()
 	local files = vim.fn.readdir(dir)
@@ -366,7 +366,7 @@ function P.list_chats()
 				if #preview > 40 then
 					preview = preview:sub(1, 37) .. "..."
 				end
-				table.insert(res, { path = p, preview = preview })
+				table.insert(res, { path = p, preview = preview, text = text })
 			end
 		end
 	end
@@ -422,10 +422,10 @@ function P.show_popup(label, cb)
 			vim.cmd("startinsert!")
 		end
 	end)
-	vim.keymap.set({ "n", "i" }, "<Esc><Esc>", function()
+	vim.keymap.set({ "n", "i" }, "<Plug>(DelphiPromptCancel)", function()
 		vim.api.nvim_win_close(win, true)
 		cb("")
-	end, { buffer = buf, noremap = true, silent = true })
+	end, { buffer = buf, noremap = true, silent = true, desc = "Delphi: cancel prompt" })
 
 	return win
 end

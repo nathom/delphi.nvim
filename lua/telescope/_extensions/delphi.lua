@@ -22,7 +22,7 @@ function M.chats(opts)
 					return {
 						value = item.path,
 						display = item.preview,
-						ordinal = item.preview,
+						ordinal = item.text,
 					}
 				end,
 			}),
@@ -37,6 +37,10 @@ function M.chats(opts)
 					vim.bo[self.state.bufnr].filetype = "markdown"
 				end,
 			}),
+			layout_strategy = "vertical",
+			layout_config = {
+				preview_height = 0.6,
+			},
 			attach_mappings = function(_, map)
 				map({ "i", "n" }, "<CR>", function(bufnr)
 					local selection = action_state.get_selected_entry()
