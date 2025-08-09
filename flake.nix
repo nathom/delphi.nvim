@@ -2,77 +2,82 @@
   description = "Dev env for delphi.nvim";
 
   inputs = {
-    nixpkgs.url      = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-utils.url  = "github:numtide/flake-utils";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
   };
 
   outputs = { self, nixpkgs, flake-utils }:
-  flake-utils.lib.eachDefaultSystem (system:
-    let
-      pkgs = import nixpkgs { inherit system; };
-      pluginSrc  = self;
-    in
-    {
-      devShells.default = pkgs.mkShell {
-        packages = with pkgs; [
-          (neovim.override { configure = { }; })
-          vimPlugins.plenary-nvim
-          vimPlugins.telescope-nvim
-          vimPlugins.nvim-cmp
-          vimPlugins.cmp-path
-          git
-          curl
-          jq
-          ripgrep
-          lua-language-server
-          stylua
-        ];
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = import nixpkgs { inherit system; };
+        pluginSrc = self;
+      in
+      {
+        devShells.default = pkgs.mkShell {
+          packages = with pkgs; [
+            (neovim.override { configure = { }; })
+            vimPlugins.plenary-nvim
+            vimPlugins.telescope-nvim
+            vimPlugins.nvim-cmp
+            vimPlugins.cmp-path
+            git
+            curl
+            jq
+            ripgrep
+            lua-language-server
+            stylua
+          ];
 
 
-        shellHook = ''
-          export NVIM_TEST_HOME=$(mktemp -d)
+          shellHook = ''
+            export NVIM_TEST_HOME=$(mktemp -d)
 
-          # expose paths to Lua
-          export DELPHI_PATH=$PWD
-          export PLENARY_PATH=${pkgs.vimPlugins.plenary-nvim}
+            # expose paths to Lua
+            export DELPHI_PATH=$PWD
+            export PLENARY_PATH=${pkgs.vimPlugins.plenary-nvim}
 
-          cat > "$NVIM_TEST_HOME/init.lua" <<'LUA'
-            local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
-            if not vim.loop.fs_stat(lazypath) then
-              vim.fn.system({
-                "git", "clone",
-                "--filter=blob:none",
-                "https://github.com/folke/lazy.nvim.git",
-                "--branch=stable", lazypath
-              })
-            end
-            vim.opt.rtp:prepend(lazypath)
+            cat > "$NVIM_TEST_HOME/init.lua" <<'LUA'
+              local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
+              if not vim.loop.fs_stat(lazypath) then
+                vim.fn.system({
+                  "git", "clone",
+                  "--filter=blob:none",
+                  "https://github.com/folke/lazy.nvim.git",
+                  "--branch=stable", lazypath
+                })
+              end
+              vim.opt.rtp:prepend(lazypath)
 
-            vim.g.mapleader = " "
-            require("lazy").setup({
-              {
-                dir = os.getenv("DELPHI_PATH"),
-                name = "delphi.nvim",
-                dependencies = { "nvim-lua/plenary.nvim", "nvim-telescope/telescope.nvim", "hrsh7th/nvim-cmp", "hrsh7th/cmp-path"},
-                opts = {
-                  allow_env_var_config = true,
-                  chat = { default_model = "gemini_flash" },
-                  rewrite = { default_model = "gemini_flash" },
-                  models = {
-                    gemini_flash = {
-                      base_url = "https://openrouter.ai/api/v1", -- SET THIS UP
-                      api_key_env_var = "OPENROUTER_API_KEY", -- SET THIS UP
-                      model_name = "google/gemini-2.5-flash",
+              vim.g.mapleader = " "
+              require("lazy").setup({
+                {
+                  dir = os.getenv("DELPHI_PATH"),
+                  name = "delphi.nvim",
+                  dependencies = { "nvim-lua/plenary.nvim", "nvim-telescope/telescope.nvim", "hrsh7th/nvim-cmp", "hrsh7th/cmp-path"},
+                  keys = {
+                    { "<leader><cr>", "<Plug>(DelphiChatSend)", desc = "Delphi: send chat" },
+                    { "<leader>r", "<Plug>(DelphiRewriteSelection)", mode = "x", desc = "Delphi: rewrite selection" },
+                  },
+                  cmd = { "Chat", "Rewrite" },
+                  opts = {
+                    allow_env_var_config = true,
+                    chat = { default_model = "gemini_flash" },
+                    rewrite = { default_model = "gemini_flash" },
+                    models = {
+                      gemini_flash = {
+                        base_url = "https://openrouter.ai/api/v1", -- SET THIS UP
+                        api_key_env_var = "OPENROUTER_API_KEY", -- SET THIS UP
+                        model_name = "google/gemini-2.5-flash",
+                      }
                     }
-                  }
-                },
-              }
-            })
-          LUA
+                  },
+                }
+              })
+            LUA
 
-          alias nvtest='XDG_CONFIG_HOME=$NVIM_TEST_HOME nvim --clean -u "$NVIM_TEST_HOME/init.lua"'
-          echo "Type 'nvtest' for an isolated NVim with plenary + your plugin."
-        '';
-      };
-    });
+            alias nvtest='XDG_CONFIG_HOME=$NVIM_TEST_HOME nvim --clean -u "$NVIM_TEST_HOME/init.lua"'
+            echo "Type 'nvtest' for an isolated NVim with plenary + your plugin."
+          '';
+        };
+      });
 }

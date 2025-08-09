@@ -337,7 +337,7 @@ function P.save_chat(buf, path)
 end
 
 ---List available chats
----@return { path:string, preview:string }[]
+---@return { path:string, preview:string, text:string }[]
 function P.list_chats()
 	local dir = P.chat_data_dir()
 	local files = vim.fn.readdir(dir)
@@ -366,7 +366,7 @@ function P.list_chats()
 				if #preview > 40 then
 					preview = preview:sub(1, 37) .. "..."
 				end
-				table.insert(res, { path = p, preview = preview })
+				table.insert(res, { path = p, preview = preview, text = text })
 			end
 		end
 	end
@@ -422,10 +422,16 @@ function P.show_popup(label, cb)
 			vim.cmd("startinsert!")
 		end
 	end)
-	vim.keymap.set({ "n", "i" }, "<Esc><Esc>", function()
+	vim.keymap.set(
+		{ "n", "i" },
+		"<ESC><ESC>",
+		"<Plug>(DelphiPromptCancel)",
+		{ buffer = buf, noremap = true, silent = true, desc = "Delphi: cancel prompt" }
+	)
+	vim.keymap.set({ "n", "i" }, "<Plug>(DelphiPromptCancel)", function()
 		vim.api.nvim_win_close(win, true)
 		cb("")
-	end, { buffer = buf, noremap = true, silent = true })
+	end, { buffer = buf, noremap = true, silent = true, desc = "Delphi: cancel prompt" })
 
 	return win
 end
@@ -451,13 +457,13 @@ function P.start_ghost_diff(buf, start_lnum, end_lnum, left_lines)
 				vim.api.nvim_buf_set_extmark(buf, ghost_ns, row, 0, {
 					virt_text = { { text, "DiffDelete" } },
 					virt_text_pos = "overlay",
-					hl_mode = "combine",
+					-- hl_mode = "combine",
 				})
 				row = row + 1
 			elseif tag == "+" then
 				vim.api.nvim_buf_set_extmark(buf, ghost_ns, row, 0, {
 					virt_lines = { { { text, "DiffAdd" } } },
-					virt_lines_above = true,
+					virt_lines_above = false,
 				})
 			end
 		end
@@ -619,6 +625,66 @@ function P.chat_invalidated(cur_lines, meta)
 		end
 	end
 	return false
+end
+
+---Adds `<rewrite_this>...</rewrite_this>` or `<insert_here></insert_here>` markers.
+---@param lines string[]  -- original buffer lines
+---@param start_lnum integer -- 1-based, inclusive
+---@param end_lnum integer   -- 1-based, inclusive
+---@return string[]          -- copy with markers inserted
+local function add_rewrite_markers(lines, start_lnum, end_lnum)
+	local ret = {}
+
+	for i = 1, start_lnum - 1 do
+		ret[#ret + 1] = lines[i]
+	end
+
+	if start_lnum == end_lnum then
+		ret[#ret + 1] = "<insert_here></insert_here>"
+		for i = start_lnum, #lines do
+			ret[#ret + 1] = lines[i]
+		end
+	else
+		ret[#ret + 1] = "<rewrite_this>"
+		for i = start_lnum, end_lnum do
+			ret[#ret + 1] = lines[i]
+		end
+		ret[#ret + 1] = "</rewrite_this>"
+		for i = end_lnum + 1, #lines do
+			ret[#ret + 1] = lines[i]
+		end
+	end
+
+	return ret
+end
+---Build a rewrite prompt for a document range
+---@param buf integer buffer id
+---@param start_lnum integer 1-based start line (inclusive)
+---@param end_lnum integer 1-based end line (inclusive)
+---@param prompt string user's prompt describing the desired change
+---@return string prompt built for the rewrite
+function P.build_rewrite_prompt(buf, start_lnum, end_lnum, prompt)
+	local ft = vim.bo[buf].filetype
+	local content_type
+	if ft == "markdown" or ft == "text" or ft == nil then
+		content_type = "text"
+	else
+		content_type = "code"
+	end
+	-- TODO: put a length limit
+	local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+	local doc_w_markers = add_rewrite_markers(lines, start_lnum, end_lnum)
+	local rewrite_lines = vim.api.nvim_buf_get_lines(buf, start_lnum - 1, end_lnum, false)
+
+	return require("delphi.rewrite").build_prompt({
+		content_type = content_type,
+		language_name = ft,
+		document_content = table.concat(doc_w_markers, "\n"),
+		is_insert = start_lnum == end_lnum,
+		is_truncated = false,
+		user_prompt = prompt,
+		rewrite_section = table.concat(rewrite_lines, "\n"),
+	})
 end
 
 return P

@@ -5,7 +5,7 @@ local P = require("delphi.primitives")
 ---@field models table<string, Model>
 ---@field allow_env_var_config boolean
 ---@field chat { system_prompt: string, default_model: string?, headers: { system: string, user: string, assistant: string } }
----@field rewrite { system_prompt: string, default_model: string?, prompt_template: string, accept_keymap: string, reject_keymap: string, global_rewrite_keymap: string? }
+---@field rewrite { default_model: string? }
 local default_opts = {
 	models = {},
 	allow_env_var_config = false,
@@ -17,30 +17,9 @@ local default_opts = {
 			user = "User:",
 			assistant = "Assistant:",
 		},
-		send_keymap = "<leader><cr>",
 	},
 	rewrite = {
 		default_model = nil,
-		system_prompt = [[
-You are Delphi, an expert refactoring assistant. You ALWAYS respond with the rewritten code or text enclosed in <delphi:refactored_code> tags:
-<delphi:refactored_code>
-...
-</delphi:refactored_code>]],
-		prompt_template = [[
-Full file for context:
-<delphi:current_file>
-{{file_text}}
-</delphi:current_file>
-
-Selected lines ({{selection_start_lnum}}:{{selection_end_lnum}}):
-<delphi:selected_lines>
-{{selected_text}}
-</delphi:selected_lines>
-
-First, think step by step about the context and the best way to rewrite the selected lines in your scratchpad in between <delphi:think></delphi:think> tags. Then write the answer in between <delphi:refactored_code></delphi:refactored_code> tags.
-
-Rewrite the selected lines according to the following instructions: {{user_instructions}}
-]],
 		accept_keymap = "<leader>a",
 		reject_keymap = "<leader>r",
 		global_rewrite_keymap = "<leader>r",
@@ -49,12 +28,10 @@ Rewrite the selected lines according to the following instructions: {{user_instr
 local M = { opts = default_opts }
 
 ---Set chat send keymap
----@param chat_keymap string
 ---@param buf integer
-function M.apply_chat_keymaps(chat_keymap, buf)
-	local opts = { desc = "Send message", silent = true, buffer = buf }
-	vim.keymap.set({ "n" }, chat_keymap, function()
-		-- TODO: make this use a lua function
+function M.apply_chat_keymaps(buf)
+	local opts = { desc = "Delphi: send message", silent = true, buffer = buf }
+	vim.keymap.set("n", "<Plug>(DelphiChatSend)", function()
 		vim.cmd([[Chat]])
 	end, opts)
 end
@@ -90,7 +67,7 @@ local function setup_chat_cmd(config)
 				return vim.notify("Chat not found")
 			end
 			local b = P.open_chat_file(entry.path)
-			M.apply_chat_keymaps(config.send_keymap, b)
+			M.apply_chat_keymaps(b)
 			return
 		end
 
@@ -117,7 +94,7 @@ local function setup_chat_cmd(config)
 			vim.b.delphi_chat_path = P.next_chat_path()
 			vim.b.delphi_meta_path = vim.b.delphi_chat_path:gsub("%.md$", "_meta.json")
 			P.save_chat(b)
-			M.apply_chat_keymaps(config.send_keymap, b)
+			M.apply_chat_keymaps(b)
 			return b
 		end
 
@@ -135,6 +112,7 @@ local function setup_chat_cmd(config)
 			if existing then
 				P.set_current_buf(existing)
 				P.set_cursor_to_user(existing)
+				M.apply_chat_keymaps(existing)
 				return
 			else
 				create_chat()
@@ -220,14 +198,6 @@ local function setup_rewrite_cmd(config)
 				return
 			end -- cancelled
 
-			local env = {
-				file_text = table.concat(file_lines, "\n"),
-				selected_text = table.concat(sel.lines, "\n"),
-				selection_start_lnum = sel.start_lnum,
-				selection_end_lnum = sel.end_lnum,
-				user_instructions = user_prompt,
-			}
-
 			-- simple fence-aware streaming state
 			local Extractor = require("delphi.extractor").Extractor
 			local extractor = Extractor.new()
@@ -244,33 +214,40 @@ local function setup_rewrite_cmd(config)
 				vim.notify("Coudln't find model " .. tostring(default_model), vim.log.levels.ERROR)
 				return
 			end
+			-- local think_spinner = require("delphi.spinner").new({
+			-- 	bufnr = vim.api.nvim_get_current_buf(),
+			-- 	autohide_on_stop = true,
+			-- 	row = sel.start_lnum,
+			-- 	label = "Thinking",
+			-- })
+			-- think_spinner:start()
+			local rewrite_prompt = P.build_rewrite_prompt(orig_buf, sel.start_lnum, sel.end_lnum, user_prompt)
 
 			openai.chat(model, {
 				stream = true,
 				messages = {
-					{ role = "system", content = M.opts.rewrite.system_prompt },
-					{ role = "user", content = P.template(M.opts.rewrite.prompt_template, env) },
+					{ role = "user", content = rewrite_prompt },
 				},
 			}, {
 				on_chunk = function(chunk, is_done)
 					if is_done then
 						local map = vim.keymap.set
-						map("n", config.accept_keymap, function()
+						map("n", "<Plug>(DelphiRewriteAccept)", function()
 							diff.accept()
 							vim.notify("applied")
-						end, { buffer = orig_buf })
-						map("n", config.reject_keymap, function()
+						end, {
+							buffer = orig_buf,
+							desc = "Delphi: accept rewrite",
+							silent = true,
+						})
+						map("n", "<Plug>(DelphiRewriteReject)", function()
 							diff.reject()
 							vim.notify("rejected")
-						end, { buffer = orig_buf })
-						vim.notify(
-							"Rewrite finished – "
-								.. config.accept_keymap
-								.. " accept "
-								.. config.reject_keymap
-								.. " reject",
-							vim.log.levels.INFO
-						)
+						end, {
+							buffer = orig_buf,
+							desc = "Delphi: reject rewrite",
+							silent = true,
+						})
 						return
 					end
 					local new_code = extractor:update(get_delta(chunk))
@@ -283,6 +260,12 @@ local function setup_rewrite_cmd(config)
 			})
 		end)
 	end, { range = true, desc = "LLM-rewrite the current visual selection" })
+	vim.keymap.set(
+		"x",
+		"<Plug>(DelphiRewriteSelection)",
+		":Rewrite<cr>",
+		{ desc = "Delphi: rewrite selection", silent = true }
+	)
 end
 
 ---Setup delphi
@@ -303,10 +286,6 @@ function M.setup(opts)
 	local ok, cmp = pcall(require, "cmp")
 	if ok then
 		cmp.register_source("delphi_path", require("delphi.cmp_source"))
-	end
-	local global_rewrite_keymap = M.opts.rewrite.global_rewrite_keymap
-	if global_rewrite_keymap then
-		vim.keymap.set("x", global_rewrite_keymap, ":Rewrite<cr>", { noremap = true, silent = true })
 	end
 end
 
