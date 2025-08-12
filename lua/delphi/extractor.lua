@@ -1,8 +1,5 @@
--- Extract code enclosed in <delphi:refactored_code> tags from a streaming
--- response. Works in O(n) overall and produces incremental output.
-
-local START_TAG = "<delphi:refactored_code>"
-local END_TAG = "</delphi:refactored_code>"
+local START_TAG = "<delphi:new_content>"
+local END_TAG = "</delphi:new_content>"
 
 ---@class Extractor
 ---@field state 'SEARCH_START'|'AFTER_START'|'OPEN_FENCE'|'SKIP_LANG'|'RECORDING'|'MAYBE_END'|'DONE'
