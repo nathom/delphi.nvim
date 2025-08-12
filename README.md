@@ -1,6 +1,11 @@
-# delphi.nvim
+<h1 align="center">delphi.nvim</h1>
 
-A tasteful LLM plugin.
+<p align="center">
+  <img src="assets/pythia.jpg" alt="Pythia" width="300" style="border: 1px solid #ddd; border-radius: 4px; padding: 2px;">
+</p>
+
+<p align="center"><em>Priestess of Delphi</em>, 1891<br>John Collier<br>Oil on canvas</p>
+
 
 ## Features
 
