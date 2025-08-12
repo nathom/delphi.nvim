@@ -1,7 +1,9 @@
+local M = {}
+
 --- Build a formatted prompt equivalent to the given Handlebars template.
 --- @param p {language_name:string|nil, is_insert:boolean, document_content:string, is_truncated:boolean, content_type:string, user_prompt:string, rewrite_section:string|nil} p Arguments table
---- @return string The formatted prompt
-local function build_prompt(p)
+--- @return string -- The formatted prompt
+function M.build_prompt(p)
 	local out = {}
 	-- Header line
 	if p.language_name and p.language_name ~= "" then
@@ -100,11 +102,11 @@ local function build_prompt(p)
 		table.insert(out, "Immediately start with the following format with no remarks:")
 		table.insert(out, "")
 		table.insert(out, "```")
-		table.insert(out, "\\{{REWRITTEN_CODE}}")
+		table.insert(out, "{{REWRITTEN_CODE}}")
 		table.insert(out, "```")
 	end
 
 	return table.concat(out, "\n")
 end
 
-return { build_prompt = build_prompt }
+return M

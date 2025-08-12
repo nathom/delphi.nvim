@@ -627,4 +627,64 @@ function P.chat_invalidated(cur_lines, meta)
 	return false
 end
 
+---Adds `<rewrite_this>...</rewrite_this>` or `<insert_here></insert_here>` markers.
+---@param lines string[]  -- original buffer lines
+---@param start_lnum integer -- 1-based, inclusive
+---@param end_lnum integer   -- 1-based, inclusive
+---@return string[]          -- copy with markers inserted
+local function add_rewrite_markers(lines, start_lnum, end_lnum)
+	local ret = {}
+
+	for i = 1, start_lnum - 1 do
+		ret[#ret + 1] = lines[i]
+	end
+
+	if start_lnum == end_lnum then
+		ret[#ret + 1] = "<insert_here></insert_here>"
+		for i = start_lnum, #lines do
+			ret[#ret + 1] = lines[i]
+		end
+	else
+		ret[#ret + 1] = "<rewrite_this>"
+		for i = start_lnum, end_lnum do
+			ret[#ret + 1] = lines[i]
+		end
+		ret[#ret + 1] = "</rewrite_this>"
+		for i = end_lnum + 1, #lines do
+			ret[#ret + 1] = lines[i]
+		end
+	end
+
+	return ret
+end
+---Build a rewrite prompt for a document range
+---@param buf integer buffer id
+---@param start_lnum integer 1-based start line (inclusive)
+---@param end_lnum integer 1-based end line (inclusive)
+---@param prompt string user's prompt describing the desired change
+---@return string prompt built for the rewrite
+function P.build_rewrite_prompt(buf, start_lnum, end_lnum, prompt)
+	local ft = vim.bo[buf].filetype
+	local content_type
+	if ft == "markdown" or ft == "text" or ft == nil then
+		content_type = "text"
+	else
+		content_type = "code"
+	end
+	-- TODO: put a length limit
+	local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+	local doc_w_markers = add_rewrite_markers(lines, start_lnum, end_lnum)
+	local rewrite_lines = vim.api.nvim_buf_get_lines(buf, start_lnum - 1, end_lnum, false)
+
+	return require("delphi.rewrite").build_prompt({
+		content_type = content_type,
+		language_name = ft,
+		document_content = table.concat(doc_w_markers, "\n"),
+		is_insert = start_lnum == end_lnum,
+		is_truncated = false,
+		user_prompt = prompt,
+		rewrite_section = table.concat(rewrite_lines, "\n"),
+	})
+end
+
 return P

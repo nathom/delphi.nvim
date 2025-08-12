@@ -5,7 +5,7 @@ local P = require("delphi.primitives")
 ---@field models table<string, Model>
 ---@field allow_env_var_config boolean
 ---@field chat { system_prompt: string, default_model: string?, headers: { system: string, user: string, assistant: string } }
----@field rewrite { system_prompt: string, default_model: string?, prompt_template: string }
+---@field rewrite { default_model: string? }
 local default_opts = {
 	models = {},
 	allow_env_var_config = false,
@@ -20,27 +20,6 @@ local default_opts = {
 	},
 	rewrite = {
 		default_model = nil,
-		system_prompt = [[
-You are Delphi, an expert refactoring assistant. You ALWAYS respond with the rewritten code or text enclosed in <delphi:refactored_code> tags:
-<delphi:refactored_code>
-...
-</delphi:refactored_code>]],
-		prompt_template = [[
-Full file for context:
-<delphi:current_file>
-{{file_text}}
-</delphi:current_file>
-
-Selected lines ({{selection_start_lnum}}:{{selection_end_lnum}}):
-<delphi:selected_lines>
-{{selected_text}}
-</delphi:selected_lines>
-
-
-First, think step by step about the context and the best way to rewrite the selected lines in your scratchpad in between <delphi:think></delphi:think> tags. Then write the answer in between <delphi:refactored_code></delphi:refactored_code> tags.
-
-Rewrite the selected lines according to the following instructions: {{user_instructions}}
-]],
 		accept_keymap = "<leader>a",
 		reject_keymap = "<leader>r",
 		global_rewrite_keymap = "<leader>r",
@@ -219,14 +198,6 @@ local function setup_rewrite_cmd(config)
 				return
 			end -- cancelled
 
-			local env = {
-				file_text = table.concat(file_lines, "\n"),
-				selected_text = table.concat(sel.lines, "\n"),
-				selection_start_lnum = sel.start_lnum,
-				selection_end_lnum = sel.end_lnum,
-				user_instructions = user_prompt,
-			}
-
 			-- simple fence-aware streaming state
 			local Extractor = require("delphi.extractor").Extractor
 			local extractor = Extractor.new()
@@ -243,19 +214,23 @@ local function setup_rewrite_cmd(config)
 				vim.notify("Coudln't find model " .. tostring(default_model), vim.log.levels.ERROR)
 				return
 			end
-			local think_spinner = require("delphi.spinner").new({
-				bufnr = vim.api.nvim_get_current_buf(),
-				autohide_on_stop = true,
-				row = sel.start_lnum,
-				label = "Thinking",
-			})
-			think_spinner:start()
+			-- local think_spinner = require("delphi.spinner").new({
+			-- 	bufnr = vim.api.nvim_get_current_buf(),
+			-- 	autohide_on_stop = true,
+			-- 	row = sel.start_lnum,
+			-- 	label = "Thinking",
+			-- })
+			-- think_spinner:start()
+			local rewrite_prompt = P.build_rewrite_prompt(orig_buf, sel.start_lnum, sel.end_lnum, user_prompt)
+			print(rewrite_prompt)
+			if true then
+				return
+			end
 
 			openai.chat(model, {
 				stream = true,
 				messages = {
-					{ role = "system", content = M.opts.rewrite.system_prompt },
-					{ role = "user", content = P.template(M.opts.rewrite.prompt_template, env) },
+					{ role = "user", content = rewrite_prompt },
 				},
 			}, {
 				on_chunk = function(chunk, is_done)
