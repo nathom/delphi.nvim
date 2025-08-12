@@ -59,9 +59,9 @@ function M.build_prompt(p)
 		table.insert(out, "")
 		table.insert(out, "Immediately start with the following format with no remarks:")
 		table.insert(out, "")
-		table.insert(out, "```")
-		table.insert(out, "\\{{INSERTED_CODE}}")
-		table.insert(out, "```")
+		table.insert(out, "<delphi:new_content>")
+		table.insert(out, "{{INSERTED_CODE}}")
+		table.insert(out, "</delphi:new_content>")
 	else
 		-- Rewrite branch instructions
 		table.insert(
@@ -101,9 +101,9 @@ function M.build_prompt(p)
 		table.insert(out, "")
 		table.insert(out, "Immediately start with the following format with no remarks:")
 		table.insert(out, "")
-		table.insert(out, "```")
+		table.insert(out, "<delphi:new_content>")
 		table.insert(out, "{{REWRITTEN_CODE}}")
-		table.insert(out, "```")
+		table.insert(out, "</delphi:new_content>")
 	end
 
 	return table.concat(out, "\n")

@@ -222,10 +222,6 @@ local function setup_rewrite_cmd(config)
 			-- })
 			-- think_spinner:start()
 			local rewrite_prompt = P.build_rewrite_prompt(orig_buf, sel.start_lnum, sel.end_lnum, user_prompt)
-			print(rewrite_prompt)
-			if true then
-				return
-			end
 
 			openai.chat(model, {
 				stream = true,
@@ -256,9 +252,6 @@ local function setup_rewrite_cmd(config)
 					end
 					local new_code = extractor:update(get_delta(chunk))
 					if #new_code then
-						if think_spinner then
-							think_spinner:stop()
-						end
 						diff.push(new_code)
 					end
 				end,
