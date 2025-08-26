@@ -189,7 +189,6 @@ local function setup_rewrite_cmd(config)
 		if #sel.lines == 0 then
 			return vim.notify("No visual selection found.", vim.log.levels.WARN)
 		end
-		local file_lines = vim.api.nvim_buf_get_lines(orig_buf, 0, -1, false)
 
 		P.show_popup("Rewrite prompt", function(user_prompt)
 			vim.notify(user_prompt)
@@ -214,13 +213,14 @@ local function setup_rewrite_cmd(config)
 				vim.notify("Coudln't find model " .. tostring(default_model), vim.log.levels.ERROR)
 				return
 			end
-			-- local think_spinner = require("delphi.spinner").new({
-			-- 	bufnr = vim.api.nvim_get_current_buf(),
-			-- 	autohide_on_stop = true,
-			-- 	row = sel.start_lnum,
-			-- 	label = "Thinking",
-			-- })
-			-- think_spinner:start()
+			local think_spinner = require("delphi.spinner").new({
+				bufnr = vim.api.nvim_get_current_buf(),
+				autohide_on_stop = true,
+				row = sel.start_lnum,
+				label = "Rewriting",
+				virt_text_pos = "right_align",
+			})
+			think_spinner:start()
 			local rewrite_prompt = P.build_rewrite_prompt(orig_buf, sel.start_lnum, sel.end_lnum, user_prompt)
 
 			openai.chat(model, {
@@ -248,7 +248,7 @@ local function setup_rewrite_cmd(config)
 							desc = "Delphi: reject rewrite",
 							silent = true,
 						})
-						return
+						think_spinner:stop()
 					end
 					local new_code = extractor:update(get_delta(chunk))
 					if #new_code then
