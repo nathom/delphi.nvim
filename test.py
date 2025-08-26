@@ -1,6 +1,98 @@
 import os
 import shutil
 import datetime
+import collections
+
+def organize_files_by_extension(source_directory, destination_base_directory=None):
+    """
+    Organizes files in a given directory into subfolders based on their file extension.
+
+    Args:
+        source_directory (str): The path to the directory to organize.
+        destination_base_directory (str, optional): The base directory where
+                                                    extension-based subfolders
+                                                    will be created. If None,
+                                                    subfolders are created
+                                                    within the source_directory.
+    """
+    if not os.path.isdir(source_directory):
+        print(f"Error: Source directory '{source_directory}' not found for extension organization.")
+        return
+
+    if destination_base_directory and not os.path.isdir(destination_base_directory):
+        try:
+            os.makedirs(destination_base_directory, exist_ok=True)
+            print(f"Created base destination directory: '{destination_base_directory}'")
+        except OSError as e:
+            print(f"Error creating destination base directory '{destination_base_directory}': {e}")
+            return
+
+    print(f"Starting file organization by extension in: {source_directory}")
+    print("-" * 50)
+
+    organized_count = 0
+    skipped_count = 0
+    error_count = 0
+
+    for filename in os.listdir(source_directory):
+        file_path = os.path.join(source_directory, filename)
+
+        if os.path.isdir(file_path):
+            print(f"Skipping directory: {filename}")
+            skipped_count += 1
+            continue
+
+        try:
+            _, ext = os.path.splitext(filename)
+            ext_name = ext.lower().lstrip('.') # Remove leading dot for folder name
+
+            if not ext_name: # Handle files with no extension
+                ext_name = "no_extension"
+
+            if destination_base_directory:
+                destination_dir = os.path.join(destination_base_directory, ext_name)
+            else:
+                destination_dir = os.path.join(source_directory, ext_name)
+
+            os.makedirs(destination_dir, exist_ok=True)
+
+            shutil.move(file_path, os.path.join(destination_dir, filename))
+            print(f"Moved: '{filename}' to '{ext_name}' folder")
+            organized_count += 1
+
+        except Exception as e:
+            print(f"Error processing '{filename}': {e}")
+            error_count += 1
+
+    print("-" * 50)
+    print("Extension-based Organization Complete!")
+    print(f"Files organized: {organized_count}")
+    print(f"Files skipped (directories): {skipped_count}")
+    print(f"Files with errors: {error_count}")
+    print(f"Total items processed: {len(os.listdir(source_directory)) + skipped_count}")
+
+def get_file_summary(directory):
+    """
+    Analyzes a directory and returns a summary of file types and their counts.
+
+    Args:
+        directory (str): The path to the directory to analyze.
+
+    Returns:
+        dict: A dictionary where keys are file extensions (e.g., '.txt', '.jpg')
+              and values are the counts of files with that extension.
+              Returns an empty dictionary if the directory doesn't exist or is empty.
+    """
+    if not os.path.isdir(directory):
+        print(f"Error: Directory '{directory}' not found for summary.")
+        return {}
+
+    file_counts = collections.defaultdict(int)
+    for root, _, files in os.walk(directory):
+        for filename in files:
+            _, ext = os.path.splitext(filename)
+            file_counts[ext.lower()] += 1
+    return dict(file_counts)
 
 def organize_files_by_date(source_directory):
     """

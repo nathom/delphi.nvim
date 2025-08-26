@@ -438,16 +438,43 @@ end
 
 local ghost_ns = vim.api.nvim_create_namespace("delphi_ghost_diff")
 
+---Start a ghost diff overlay for live preview while streaming new content.
+---@param buf integer            Buffer handle
+---@param start_lnum integer     1-based, inclusive start line of selection/insert
+---@param end_lnum integer       1-based, inclusive end line of selection/insert
+---@param left_lines string[]    Original selected lines (empty for insert)
+---@return { push: fun(tok:string), accept: fun(), reject: fun() }
 function P.start_ghost_diff(buf, start_lnum, end_lnum, left_lines)
 	local Differ = require("delphi.patience").Differ
 	local d = Differ:new()
 	local right_text = ""
+	local is_insert = (start_lnum == end_lnum)
 
+	---Render the diff preview. For insert-at (single-line), render as a simple
+	---append preview without running a diff to avoid noisy overlays.
+	---@param lines string[]  -- difflib-style lines when not insert mode
 	local function render(lines)
 		-- There's probably a way to optimize this
 		vim.api.nvim_buf_clear_namespace(buf, ghost_ns, 0, -1)
 
 		local row = start_lnum - 1
+
+		if is_insert then
+			-- Simple insert preview: show all new lines as additions at the insert point
+			local right_lines = vim.split(right_text, "\n", { plain = true, trimempty = false })
+			local virt_lines = {}
+			for _, rl in ipairs(right_lines) do
+				virt_lines[#virt_lines + 1] = { { rl, "DiffAdd" } }
+			end
+			if #virt_lines > 0 then
+				vim.api.nvim_buf_set_extmark(buf, ghost_ns, row, 0, {
+					virt_lines = virt_lines,
+					virt_lines_above = false,
+				})
+			end
+			return
+		end
+
 		for _, l in ipairs(lines) do
 			local tag = l:sub(1, 1)
 			local text = l:sub(3)
@@ -457,7 +484,6 @@ function P.start_ghost_diff(buf, start_lnum, end_lnum, left_lines)
 				vim.api.nvim_buf_set_extmark(buf, ghost_ns, row, 0, {
 					virt_text = { { text, "DiffDelete" } },
 					virt_text_pos = "overlay",
-					-- hl_mode = "combine",
 				})
 				row = row + 1
 			elseif tag == "+" then
@@ -472,13 +498,24 @@ function P.start_ghost_diff(buf, start_lnum, end_lnum, left_lines)
 	return {
 		push = function(tok)
 			right_text = right_text .. tok
-			local right_lines = vim.split(right_text, "\n", { plain = true, trimempty = false })
-			render(d:compare(left_lines, right_lines))
+			if is_insert then
+				-- No diffing; just render the insertion preview
+				render({})
+			else
+				local right_lines = vim.split(right_text, "\n", { plain = true, trimempty = false })
+				render(d:compare(left_lines, right_lines))
+			end
 		end,
 		accept = function()
 			local lines = vim.split(right_text, "\n", { plain = true, trimempty = true })
 			pcall(vim.cmd, "undojoin")
-			vim.api.nvim_buf_set_lines(buf, start_lnum - 1, end_lnum, false, lines)
+			if is_insert then
+				-- Insert without replacing existing content
+				vim.api.nvim_buf_set_lines(buf, start_lnum - 1, start_lnum - 1, false, lines)
+			else
+				-- Replace selection with rewritten content
+				vim.api.nvim_buf_set_lines(buf, start_lnum - 1, end_lnum, false, lines)
+			end
 			vim.api.nvim_buf_clear_namespace(buf, ghost_ns, 0, -1)
 		end,
 		reject = function()

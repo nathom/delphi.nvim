@@ -217,7 +217,7 @@ local function setup_rewrite_cmd(config)
 				bufnr = vim.api.nvim_get_current_buf(),
 				autohide_on_stop = true,
 				row = sel.start_lnum,
-				label = "Rewriting",
+				label = "Generating",
 				virt_text_pos = "right_align",
 			})
 			think_spinner:start()
