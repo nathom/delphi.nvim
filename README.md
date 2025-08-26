@@ -23,9 +23,8 @@ Example configuration with lazy.nvim:
   "nathom/delphi.nvim",
   keys = {
     { "<leader><cr>", "<Plug>(DelphiChatSend)", desc = "Delphi: send chat" },
-    -- Ergonomic rewrite/insert: <leader>k
-    { "<leader>k", "<Plug>(DelphiRewriteSelection)", mode = { "x", "s" }, desc = "Delphi: rewrite selection" },
-    { "<leader>k", "<Plug>(DelphiInsertAtCursor)", mode = { "n", "i" }, desc = "Delphi: insert at cursor" },
+    { "<C-i>", "<Plug>(DelphiRewriteSelection)", mode = { "x", "s" }, desc = "Delphi: rewrite selection" },
+    { "<C-i>", "<Plug>(DelphiInsertAtCursor)", mode = { "n", "i" }, desc = "Delphi: insert at cursor" },
     { "<leader>a", "<Plug>(DelphiRewriteAccept)", desc = "Delphi: accept rewrite" },
     { "<leader>R", "<Plug>(DelphiRewriteReject)", desc = "Delphi: reject rewrite" },
   },
@@ -129,13 +128,13 @@ To use it
 
 - open a buffer with some text
 - highlight a few lines in Visual Lines mode (shift-V)
-- press `<leader>k` (or use `<Plug>(DelphiRewriteSelection)`) to open the prompt
+- press `<C-i>` (or use `<Plug>(DelphiRewriteSelection)`) to open the prompt
 - instruct the model, hit `ENTER`
 - accept or reject the changes via `<Plug>(DelphiRewriteAccept)` or `<Plug>(DelphiRewriteReject)`
 
 Insert at cursor
 
-- from Normal or Insert mode, press `<leader>k` (or use `<Plug>(DelphiInsertAtCursor)`) to insert at the current line
+- from Normal or Insert mode, press `<C-i>` (or use `<Plug>(DelphiInsertAtCursor)`) to insert at the current line
 - the diff preview shows only additions; accepting applies the generated lines at the cursor line
 - press `<Esc><Esc>` inside the prompt popup to cancel (mapping is local to the popup only)
 
