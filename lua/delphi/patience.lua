@@ -79,8 +79,8 @@ end
 ---@param token_id integer
 ---@return boolean
 function PatienceDiff:_is_junk_token(token_id)
-    local s = self._interner.tokens[token_id]
-    return type(s) == "string" and s:match("^%s*$") ~= nil
+	local s = self._interner.tokens[token_id]
+	return type(s) == "string" and s:match("^%s*$") ~= nil
 end
 
 --- Build a histogram for the 'before' range [b_start, b_end], ignoring junk and very common tokens.
@@ -88,30 +88,30 @@ end
 ---@param b_end integer
 ---@return table<integer, integer[]> histogram  -- token -> list of ABSOLUTE positions in a_tokens within the range
 function PatienceDiff:_build_histogram(b_start, b_end)
-    ---@type table<integer, integer>
-    local counts = {}
-    for i = b_start, b_end do
-        local t = self.a_tokens[i]
-        if not self:_is_junk_token(t) then
-            counts[t] = (counts[t] or 0) + 1
-        end
-    end
-    ---@type table<integer, integer[]>
-    local histogram = {}
-    for i = b_start, b_end do
-        local t = self.a_tokens[i]
-        if not self:_is_junk_token(t) then
-            if (counts[t] or 0) <= MAX_CHAIN_LEN then
-                local arr = histogram[t]
-                if arr == nil then
-                    arr = {}
-                    histogram[t] = arr
-                end
-                table.insert(arr, i) -- store ABSOLUTE index
-            end
-        end
-    end
-    return histogram
+	---@type table<integer, integer>
+	local counts = {}
+	for i = b_start, b_end do
+		local t = self.a_tokens[i]
+		if not self:_is_junk_token(t) then
+			counts[t] = (counts[t] or 0) + 1
+		end
+	end
+	---@type table<integer, integer[]>
+	local histogram = {}
+	for i = b_start, b_end do
+		local t = self.a_tokens[i]
+		if not self:_is_junk_token(t) then
+			if (counts[t] or 0) <= MAX_CHAIN_LEN then
+				local arr = histogram[t]
+				if arr == nil then
+					arr = {}
+					histogram[t] = arr
+				end
+				table.insert(arr, i) -- store ABSOLUTE index
+			end
+		end
+	end
+	return histogram
 end
 
 --- Finds the best contiguous LCS between two ranges without allocating slices.
@@ -124,65 +124,72 @@ end
 ---@param histogram table<integer, integer[]>  token -> list of ABS positions in [b_start,b_end]
 ---@return Lcs?
 function PatienceDiff:_find_lcs_indexed(b_start, b_end, a_start, a_end, histogram)
-    local min_occurrences = MAX_CHAIN_LEN + 1
-    ---@type Lcs
-    local best_lcs = { before_start = b_start, after_start = a_start, length = 0 }
-    local found_cs = false
+	local min_occurrences = MAX_CHAIN_LEN + 1
+	---@type Lcs
+	local best_lcs = { before_start = b_start, after_start = a_start, length = 0 }
+	local found_cs = false
 
-    local after_pos = a_start
-    while after_pos <= a_end do
-        local token = self.b_tokens[after_pos]
+	local after_pos = a_start
+	while after_pos <= a_end do
+		local token = self.b_tokens[after_pos]
 
-        local occurrences_in_before = histogram[token] or {}
-        local num_occurrences = #occurrences_in_before
+		local occurrences_in_before = histogram[token] or {}
+		local num_occurrences = #occurrences_in_before
 
-        if num_occurrences == 0 or num_occurrences > min_occurrences then
-            after_pos = after_pos + 1
-        else
-            found_cs = true
+		if num_occurrences == 0 or num_occurrences > min_occurrences then
+			after_pos = after_pos + 1
+		else
+			found_cs = true
 
-            local next_after_pos = after_pos + 1
-            for _, before_pos in ipairs(occurrences_in_before) do
-                -- Extend match backwards
-                local start1, start2 = before_pos, after_pos
-                local current_min_occurrences = num_occurrences
-                while start1 > b_start and start2 > a_start and self.a_tokens[start1 - 1] == self.b_tokens[start2 - 1] do
-                    start1 = start1 - 1
-                    start2 = start2 - 1
-                    local new_occ = #(histogram[self.a_tokens[start1]] or {})
-                    current_min_occurrences = math.min(current_min_occurrences, new_occ)
-                end
+			local next_after_pos = after_pos + 1
+			for _, before_pos in ipairs(occurrences_in_before) do
+				-- Extend match backwards
+				local start1, start2 = before_pos, after_pos
+				local current_min_occurrences = num_occurrences
+				while
+					start1 > b_start
+					and start2 > a_start
+					and self.a_tokens[start1 - 1] == self.b_tokens[start2 - 1]
+				do
+					start1 = start1 - 1
+					start2 = start2 - 1
+					local new_occ = #(histogram[self.a_tokens[start1]] or {})
+					current_min_occurrences = math.min(current_min_occurrences, new_occ)
+				end
 
-                -- Extend match forwards
-                local end1, end2 = before_pos, after_pos
-                while end1 < b_end and end2 < a_end and self.a_tokens[end1 + 1] == self.b_tokens[end2 + 1] do
-                    local new_occ = #(histogram[self.a_tokens[end1 + 1]] or {})
-                    current_min_occurrences = math.min(current_min_occurrences, new_occ)
-                    end1 = end1 + 1
-                    end2 = end2 + 1
-                end
+				-- Extend match forwards
+				local end1, end2 = before_pos, after_pos
+				while end1 < b_end and end2 < a_end and self.a_tokens[end1 + 1] == self.b_tokens[end2 + 1] do
+					local new_occ = #(histogram[self.a_tokens[end1 + 1]] or {})
+					current_min_occurrences = math.min(current_min_occurrences, new_occ)
+					end1 = end1 + 1
+					end2 = end2 + 1
+				end
 
-                local length = end1 - start1 + 1
+				local length = end1 - start1 + 1
 
-                -- Update best LCS if this one is longer, or same length but rarer
-                if length > best_lcs.length or (length == best_lcs.length and current_min_occurrences < min_occurrences) then
-                    min_occurrences = current_min_occurrences
-                    best_lcs = { before_start = start1, after_start = start2, length = length }
-                end
+				-- Update best LCS if this one is longer, or same length but rarer
+				if
+					length > best_lcs.length
+					or (length == best_lcs.length and current_min_occurrences < min_occurrences)
+				then
+					min_occurrences = current_min_occurrences
+					best_lcs = { before_start = start1, after_start = start2, length = length }
+				end
 
-                if end2 >= next_after_pos then
-                    next_after_pos = end2 + 1
-                end
-            end
-            after_pos = next_after_pos
-        end
-    end
+				if end2 >= next_after_pos then
+					next_after_pos = end2 + 1
+				end
+			end
+			after_pos = next_after_pos
+		end
+	end
 
-    if found_cs and min_occurrences <= MAX_CHAIN_LEN then
-        return best_lcs
-    else
-        return nil
-    end
+	if found_cs and min_occurrences <= MAX_CHAIN_LEN then
+		return best_lcs
+	else
+		return nil
+	end
 end
 
 --- Small-range dynamic programming diff for improved quality on tiny slices.
@@ -193,63 +200,63 @@ end
 ---@param removed boolean[]
 ---@param added boolean[]
 function PatienceDiff:_dp_diff_small(b_start, b_end, a_start, a_end, removed, added)
-    local m = b_end - b_start + 1
-    local n = a_end - a_start + 1
-    if m <= 0 and n <= 0 then
-        return
-    end
-    -- Build local token arrays for the slice (kept small by threshold)
-    ---@type integer[]
-    local A = {}
-    ---@type integer[]
-    local B = {}
-    for i = 1, m do
-        A[i] = self.a_tokens[b_start + i - 1]
-    end
-    for j = 1, n do
-        B[j] = self.b_tokens[a_start + j - 1]
-    end
-    -- LCS length DP table (m+1) x (n+1)
-    local L = {}
-    for i = 0, m do
-        L[i] = {}
-        for j = 0, n do
-            L[i][j] = 0
-        end
-    end
-    for i = m - 1, 0, -1 do
-        for j = n - 1, 0, -1 do
-            if A[i + 1] == B[j + 1] then
-                L[i][j] = 1 + L[i + 1][j + 1]
-            else
-                local v1 = L[i + 1][j]
-                local v2 = L[i][j + 1]
-                L[i][j] = (v1 >= v2) and v1 or v2
-            end
-        end
-    end
-    -- Reconstruct diff and mark booleans
-    local i, j = 0, 0
-    while i < m and j < n do
-        if A[i + 1] == B[j + 1] then
-            i = i + 1
-            j = j + 1
-        elseif L[i + 1][j] >= L[i][j + 1] then
-            removed[b_start + i] = true
-            i = i + 1
-        else
-            added[a_start + j] = true
-            j = j + 1
-        end
-    end
-    while i < m do
-        removed[b_start + i] = true
-        i = i + 1
-    end
-    while j < n do
-        added[a_start + j] = true
-        j = j + 1
-    end
+	local m = b_end - b_start + 1
+	local n = a_end - a_start + 1
+	if m <= 0 and n <= 0 then
+		return
+	end
+	-- Build local token arrays for the slice (kept small by threshold)
+	---@type integer[]
+	local A = {}
+	---@type integer[]
+	local B = {}
+	for i = 1, m do
+		A[i] = self.a_tokens[b_start + i - 1]
+	end
+	for j = 1, n do
+		B[j] = self.b_tokens[a_start + j - 1]
+	end
+	-- LCS length DP table (m+1) x (n+1)
+	local L = {}
+	for i = 0, m do
+		L[i] = {}
+		for j = 0, n do
+			L[i][j] = 0
+		end
+	end
+	for i = m - 1, 0, -1 do
+		for j = n - 1, 0, -1 do
+			if A[i + 1] == B[j + 1] then
+				L[i][j] = 1 + L[i + 1][j + 1]
+			else
+				local v1 = L[i + 1][j]
+				local v2 = L[i][j + 1]
+				L[i][j] = (v1 >= v2) and v1 or v2
+			end
+		end
+	end
+	-- Reconstruct diff and mark booleans
+	local i, j = 0, 0
+	while i < m and j < n do
+		if A[i + 1] == B[j + 1] then
+			i = i + 1
+			j = j + 1
+		elseif L[i + 1][j] >= L[i][j + 1] then
+			removed[b_start + i] = true
+			i = i + 1
+		else
+			added[a_start + j] = true
+			j = j + 1
+		end
+	end
+	while i < m do
+		removed[b_start + i] = true
+		i = i + 1
+	end
+	while j < n do
+		added[a_start + j] = true
+		j = j + 1
+	end
 end
 
 --- Computes the diff between sequences a and b.
@@ -436,40 +443,40 @@ end
 ---@param b string[] The "after" sequence of lines
 ---@return string[] Array of diff lines with prefixes: "- ", "+ ", "  "
 function Differ:compare(a, b)
-    local differ = PatienceDiff:new(a, b)
-    local removed, added = differ:diff()
+	local differ = PatienceDiff:new(a, b)
+	local removed, added = differ:diff()
 
-    local result = {}
-    local i, j = 1, 1
+	local result = {}
+	local i, j = 1, 1
 
-    while i <= #a or j <= #b do
-        local is_removed = (i <= #a) and removed[i] or false
-        local is_added = (j <= #b) and added[j] or false
+	while i <= #a or j <= #b do
+		local is_removed = (i <= #a) and removed[i] or false
+		local is_added = (j <= #b) and added[j] or false
 
-        if is_removed then
-            table.insert(result, "- " .. a[i])
-            i = i + 1
-        elseif is_added then
-            table.insert(result, "+ " .. b[j])
-            j = j + 1
-        elseif (i <= #a) and (j <= #b) then
-            table.insert(result, "  " .. a[i])
-            i = i + 1
-            j = j + 1
-        else
-            -- Safety fallbacks for mismatched tails (should be rare)
-            if i <= #a then
-                table.insert(result, "- " .. a[i])
-                i = i + 1
-            end
-            if j <= #b then
-                table.insert(result, "+ " .. b[j])
-                j = j + 1
-            end
-        end
-    end
+		if is_removed then
+			table.insert(result, "- " .. a[i])
+			i = i + 1
+		elseif is_added then
+			table.insert(result, "+ " .. b[j])
+			j = j + 1
+		elseif (i <= #a) and (j <= #b) then
+			table.insert(result, "  " .. a[i])
+			i = i + 1
+			j = j + 1
+		else
+			-- Safety fallbacks for mismatched tails (should be rare)
+			if i <= #a then
+				table.insert(result, "- " .. a[i])
+				i = i + 1
+			end
+			if j <= #b then
+				table.insert(result, "+ " .. b[j])
+				j = j + 1
+			end
+		end
+	end
 
-    return result
+	return result
 end
 
 return {
