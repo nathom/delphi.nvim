@@ -380,32 +380,40 @@ end
 ---@param b string[] The "after" sequence of lines
 ---@return string[] Array of diff lines with prefixes: "- ", "+ ", "  "
 function Differ:compare(a, b)
-	local differ = PatienceDiff:new(a, b)
-	local removed, added = differ:diff()
+    local differ = PatienceDiff:new(a, b)
+    local removed, added = differ:diff()
 
-	local result = {}
-	local i, j = 1, 1
+    local result = {}
+    local i, j = 1, 1
 
-	while i <= #a or j <= #b do
-		if i <= #a and removed[i] then
-			-- Line removed from a
-			table.insert(result, "- " .. a[i])
-			i = i + 1
-		elseif j <= #b and added[j] then
-			-- Line added to b
-			table.insert(result, "+ " .. b[j])
-			j = j + 1
-		else
-			-- Line is common (equal)
-			if i <= #a then
-				table.insert(result, "  " .. a[i])
-			end
-			i = i + 1
-			j = j + 1
-		end
-	end
+    while i <= #a or j <= #b do
+        local is_removed = (i <= #a) and removed[i] or false
+        local is_added = (j <= #b) and added[j] or false
 
-	return result
+        if is_removed then
+            table.insert(result, "- " .. a[i])
+            i = i + 1
+        elseif is_added then
+            table.insert(result, "+ " .. b[j])
+            j = j + 1
+        elseif (i <= #a) and (j <= #b) then
+            table.insert(result, "  " .. a[i])
+            i = i + 1
+            j = j + 1
+        else
+            -- Safety fallbacks for mismatched tails (should be rare)
+            if i <= #a then
+                table.insert(result, "- " .. a[i])
+                i = i + 1
+            end
+            if j <= #b then
+                table.insert(result, "+ " .. b[j])
+                j = j + 1
+            end
+        end
+    end
+
+    return result
 end
 
 return {
