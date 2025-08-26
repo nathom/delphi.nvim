@@ -243,9 +243,12 @@ function P.open_new_chat_buffer(system_prompt, model_name, temperature)
 	}
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
 
-	-- Enable cmp source for @-file mentions in this chat buffer, if available
+	-- Enable cmp source for @-file mentions in this chat buffer, if available.
 	local ok_cmp, cmp = pcall(require, "cmp")
 	if ok_cmp then
+		if type(P.ensure_cmp_source_registered) == "function" then
+			P.ensure_cmp_source_registered()
+		end
 		local sources = cmp.get_config().sources or {}
 		local has_delphi = false
 		for _, s in ipairs(sources) do
@@ -311,6 +314,9 @@ function P.open_chat_file(path)
 	-- Enable cmp source for @-file mentions in this chat buffer, if available
 	local ok_cmp, cmp = pcall(require, "cmp")
 	if ok_cmp then
+		if type(P.ensure_cmp_source_registered) == "function" then
+			P.ensure_cmp_source_registered()
+		end
 		local sources = cmp.get_config().sources or {}
 		local has_delphi = false
 		for _, s in ipairs(sources) do
@@ -426,7 +432,8 @@ function P.get_visual_selection(buf)
 	return { lines = lines, start_lnum = s, end_lnum = e }
 end
 
-local popup = require("plenary.popup")
+-- plenary.popup is required lazily inside P.show_popup to avoid loading
+-- plenary at startup/module import time.
 
 ---Show a centered popup that accepts multiline input.
 ---Accept with <CR> in Normal mode. Cancel with <Esc><Esc>.
@@ -434,6 +441,7 @@ local popup = require("plenary.popup")
 ---@param cb fun(text:string)|nil
 ---@return integer win
 function P.show_popup(label, cb)
+	local popup = require("plenary.popup")
 	cb = cb or function() end
 
 	local width = math.floor(vim.o.columns * 0.60)
@@ -621,6 +629,24 @@ function P.apply_rewrite_plug_mappings()
 		desc = "Delphi: insert at cursor",
 		silent = true,
 	})
+end
+
+---Register the cmp source for delphi path completion once, on demand.
+---@return nil
+function P.ensure_cmp_source_registered()
+	if vim.g.delphi_cmp_registered then
+		return
+	end
+	local ok_cmp, cmp = pcall(require, "cmp")
+	if not ok_cmp then
+		return
+	end
+	local ok_src, src = pcall(require, "delphi.cmp_source")
+	if not ok_src then
+		return
+	end
+	cmp.register_source("delphi_path", src)
+	vim.g.delphi_cmp_registered = true
 end
 
 -- chat metadata helpers ------------------------------------------------------

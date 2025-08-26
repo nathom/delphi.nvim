@@ -7,12 +7,13 @@ local previewers = require("telescope.previewers")
 local actions = require("telescope.actions")
 local action_state = require("telescope.actions.state")
 local builtin = require("telescope.builtin")
-local P = require("delphi.primitives")
+-- Lazy-require primitives inside functions to avoid loading on startup
 
 local M = {}
 
 function M.chats(opts)
 	opts = opts or {}
+	local P = require("delphi.primitives")
 	pickers
 		.new(opts, {
 			prompt_title = "Chats",
@@ -55,7 +56,8 @@ end
 
 local function preview_index()
 	local idx = {}
-	for _, chat in ipairs(require("delphi.primitives").list_chats()) do
+	local P = require("delphi.primitives")
+	for _, chat in ipairs(P.list_chats()) do
 		idx[chat.path] = chat.preview
 	end
 	return idx
