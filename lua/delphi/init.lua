@@ -1,5 +1,6 @@
-local openai = require("delphi.openai")
-local P = require("delphi.primitives")
+-- Note: avoid heavy requires at module load time.
+-- We require modules like openai/primitives only inside the functions
+-- that actually use them to keep startup overhead minimal.
 
 ---@class Config
 ---@field models table<string, Model>
@@ -50,6 +51,7 @@ end
 
 local function setup_chat_cmd(config)
 	vim.api.nvim_create_user_command("Chat", function(opts)
+		local P = require("delphi.primitives")
 		local args = opts.fargs
 
 		if args[1] == "list" then
@@ -171,6 +173,7 @@ local function setup_chat_cmd(config)
 			return
 		end
 		local temperature = fm.temperature or model.temperature
+		local openai = require("delphi.openai")
 		openai.chat(model, {
 			stream = true,
 			messages = new_messages,
@@ -203,6 +206,7 @@ end
 
 local function setup_rewrite_cmd(config)
 	vim.api.nvim_create_user_command("Rewrite", function()
+		local P = require("delphi.primitives")
 		local orig_buf = vim.api.nvim_get_current_buf()
 		local sel = P.get_visual_selection(orig_buf)
 		if #sel.lines == 0 then
@@ -242,6 +246,7 @@ local function setup_rewrite_cmd(config)
 			think_spinner:start()
 			local rewrite_prompt = P.build_rewrite_prompt(orig_buf, sel.start_lnum, sel.end_lnum, user_prompt)
 
+			local openai = require("delphi.openai")
 			openai.chat(model, {
 				stream = true,
 				messages = {
@@ -279,9 +284,9 @@ local function setup_rewrite_cmd(config)
 			})
 		end)
 	end, { range = true, desc = "LLM-rewrite the current visual selection or insert-at-cursor" })
-	-- Define <Plug> mappings once so users can bind ergonomically
-	P.apply_rewrite_plug_mappings()
-end
+    -- Define <Plug> mappings once so users can bind ergonomically
+    require("delphi.primitives").apply_rewrite_plug_mappings()
+    end
 
 ---Setup delphi
 ---@param opts Config
@@ -294,14 +299,11 @@ function M.setup(opts)
 
 	M.opts = vim.tbl_deep_extend("force", M.opts, opts or {})
 
+	-- Configure primitives with headers (safe/lightweight)
+	local P = require("delphi.primitives")
 	P.set_headers(M.opts.chat.headers)
 	setup_chat_cmd(M.opts.chat)
 	setup_rewrite_cmd(M.opts.rewrite)
-
-	local ok, cmp = pcall(require, "cmp")
-	if ok then
-		cmp.register_source("delphi_path", require("delphi.cmp_source"))
-	end
 end
 
 return M
