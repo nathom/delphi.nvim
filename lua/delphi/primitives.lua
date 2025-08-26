@@ -399,72 +399,62 @@ local popup = require("plenary.popup")
 ---@param cb fun(text:string)|nil
 ---@return integer win
 function P.show_popup(label, cb)
-    cb = cb or function() end
+	cb = cb or function() end
 
-    local width = math.floor(vim.o.columns * 0.60)
-    local height = 5
-    local win = popup.create({ "" }, {
-        title = label,
-        enter = true,
-        line = math.floor((vim.o.lines - height) / 2),
-        col = math.floor((vim.o.columns - width) / 2),
-        minheight = height,
-        minwidth = width,
-        borderchars = { "─", "│", "─", "│", "╭", "╮", "╯", "╰" },
-    })
+	local width = math.floor(vim.o.columns * 0.60)
+	local height = 5
+	local win = popup.create({ "" }, {
+		title = label,
+		enter = true,
+		line = math.floor((vim.o.lines - height) / 2),
+		col = math.floor((vim.o.columns - width) / 2),
+		minheight = height,
+		minwidth = width,
+		borderchars = { "─", "│", "─", "│", "╭", "╮", "╯", "╰" },
+	})
 
-    local buf = vim.api.nvim_win_get_buf(win)
+	local buf = vim.api.nvim_win_get_buf(win)
 
-    -- Use a normal scratch buffer so newlines are inserted naturally.
-    vim.bo[buf].buftype = "nofile"
-    vim.bo[buf].bufhidden = "wipe"
-    vim.bo[buf].filetype = "markdown"
+	-- Use a normal scratch buffer so newlines are inserted naturally.
+	vim.bo[buf].buftype = "nofile"
+	vim.bo[buf].bufhidden = "wipe"
+	vim.bo[buf].filetype = "markdown"
 
-    -- Submit helper
-    local function submit()
-        if not vim.api.nvim_win_is_valid(win) then
-            return
-        end
-        local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-        vim.api.nvim_win_close(win, true)
-        cb(vim.trim(table.concat(lines, "\n")))
-    end
+	-- Submit helper
+	local function submit()
+		if not vim.api.nvim_win_is_valid(win) then
+			return
+		end
+		local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+		vim.api.nvim_win_close(win, true)
+		cb(vim.trim(table.concat(lines, "\n")))
+	end
 
-    -- Keymaps: cancel with <Esc><Esc>; submit with <CR> in Normal mode
-    vim.keymap.set(
-        { "n", "i" },
-        "<ESC><ESC>",
-        "<Plug>(DelphiPromptCancel)",
-        { buffer = buf, noremap = true, silent = true, desc = "Delphi: cancel prompt" }
-    )
-    vim.keymap.set(
-        { "n", "i" },
-        "<Plug>(DelphiPromptCancel)",
-        function()
-            if vim.api.nvim_win_is_valid(win) then
-                vim.api.nvim_win_close(win, true)
-            end
-            cb("")
-        end,
-        { buffer = buf, noremap = true, silent = true, desc = "Delphi: cancel prompt" }
-    )
-    vim.keymap.set(
-        "n",
-        "<CR>",
-        function()
-            submit()
-        end,
-        { buffer = buf, noremap = true, silent = true, desc = "Delphi: submit prompt" }
-    )
+	-- Keymaps: cancel with <Esc> in Normal mode; submit with <CR> in Normal mode
+	vim.keymap.set(
+		"n",
+		"<ESC>",
+		"<Plug>(DelphiPromptCancel)",
+		{ buffer = buf, noremap = true, silent = true, desc = "Delphi: cancel prompt" }
+	)
+	vim.keymap.set("n", "<Plug>(DelphiPromptCancel)", function()
+		if vim.api.nvim_win_is_valid(win) then
+			vim.api.nvim_win_close(win, true)
+		end
+		cb("")
+	end, { buffer = buf, noremap = true, silent = true, desc = "Delphi: cancel prompt" })
+	vim.keymap.set("n", "<CR>", function()
+		submit()
+	end, { buffer = buf, noremap = true, silent = true, desc = "Delphi: submit prompt" })
 
-    vim.schedule(function()
-        if vim.api.nvim_win_is_valid(win) then
-            vim.api.nvim_set_current_win(win)
-            vim.cmd("startinsert!")
-        end
-    end)
+	vim.schedule(function()
+		if vim.api.nvim_win_is_valid(win) then
+			vim.api.nvim_set_current_win(win)
+			vim.cmd("startinsert!")
+		end
+	end)
 
-    return win
+	return win
 end
 
 local ghost_ns = vim.api.nvim_create_namespace("delphi_ghost_diff")
@@ -576,26 +566,26 @@ end
 ---Ensure <Plug>-style mappings for Rewrite/Insert exist.
 ---@return nil
 function P.apply_rewrite_plug_mappings()
-    if vim.g.delphi_rewrite_plugs_applied then
-        return
-    end
-    vim.g.delphi_rewrite_plugs_applied = true
+	if vim.g.delphi_rewrite_plugs_applied then
+		return
+	end
+	vim.g.delphi_rewrite_plugs_applied = true
 
-    -- Visual/Select: rewrite the current selection
-    vim.keymap.set({ "x", "s" }, "<Plug>(DelphiRewriteSelection)", ":<C-u>Rewrite<CR>", {
-        desc = "Delphi: rewrite selection",
-        silent = true,
-    })
+	-- Visual/Select: rewrite the current selection
+	vim.keymap.set({ "x", "s" }, "<Plug>(DelphiRewriteSelection)", ":<C-u>Rewrite<CR>", {
+		desc = "Delphi: rewrite selection",
+		silent = true,
+	})
 
-    -- Normal/Insert: insert at cursor (single-line mode)
-    vim.keymap.set("n", "<Plug>(DelphiInsertAtCursor)", ":Rewrite<CR>", {
-        desc = "Delphi: insert at cursor",
-        silent = true,
-    })
-    vim.keymap.set("i", "<Plug>(DelphiInsertAtCursor)", "<C-o>:Rewrite<CR>", {
-        desc = "Delphi: insert at cursor",
-        silent = true,
-    })
+	-- Normal/Insert: insert at cursor (single-line mode)
+	vim.keymap.set("n", "<Plug>(DelphiInsertAtCursor)", ":Rewrite<CR>", {
+		desc = "Delphi: insert at cursor",
+		silent = true,
+	})
+	vim.keymap.set("i", "<Plug>(DelphiInsertAtCursor)", "<C-o>:Rewrite<CR>", {
+		desc = "Delphi: insert at cursor",
+		silent = true,
+	})
 end
 
 -- chat metadata helpers ------------------------------------------------------
