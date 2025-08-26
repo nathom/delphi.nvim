@@ -33,6 +33,7 @@ Example configuration with lazy.nvim:
     { "<leader>a", "<Plug>(DelphiRewriteAccept)", desc = "Delphi: accept rewrite" },
     { "<leader>R", "<Plug>(DelphiRewriteReject)", desc = "Delphi: reject rewrite" },
   },
+  cmd = { "Chat", "Rewrite" },
   opts = {
     chat = { default_model = "gemini_flash" },
     rewrite = { default_model = "gemini_flash" },
@@ -45,9 +46,6 @@ Example configuration with lazy.nvim:
     },
   },
   dependencies = { "nvim-lua/plenary.nvim", "nvim-telescope/telescope.nvim" },
-  init = function()
-    pcall(function() require('telescope').load_extension('delphi') end)
-  end,
 }
 ```
 
