@@ -1,7 +1,3 @@
--- Note: avoid heavy requires at module load time.
--- We require modules like openai/primitives only inside the functions
--- that actually use them to keep startup overhead minimal.
-
 ---@class Config
 ---@field models table<string, Model>
 ---@field allow_env_var_config boolean
@@ -284,9 +280,9 @@ local function setup_rewrite_cmd(config)
 			})
 		end)
 	end, { range = true, desc = "LLM-rewrite the current visual selection or insert-at-cursor" })
-    -- Define <Plug> mappings once so users can bind ergonomically
-    require("delphi.primitives").apply_rewrite_plug_mappings()
-    end
+	-- Define <Plug> mappings once so users can bind ergonomically
+	require("delphi.primitives").apply_rewrite_plug_mappings()
+end
 
 ---Setup delphi
 ---@param opts Config
