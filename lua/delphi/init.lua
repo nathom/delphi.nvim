@@ -142,20 +142,20 @@ local function setup_chat_cmd(config)
 
 		P.write_chat_meta(vim.b.delphi_chat_path, new_meta)
 
-        -- Add assistant header and start a right-aligned spinner on that line
-        P.append_line_to_buf(buf, "")
-        P.append_line_to_buf(buf, P.headers.assistant)
-        local assistant_header_lnum = vim.api.nvim_buf_line_count(buf) -- 1-based
-        P.append_line_to_buf(buf, "")
+		-- Add assistant header and start a right-aligned spinner on that line
+		P.append_line_to_buf(buf, "")
+		P.append_line_to_buf(buf, P.headers.assistant)
+		local assistant_header_lnum = vim.api.nvim_buf_line_count(buf) -- 1-based
+		P.append_line_to_buf(buf, "")
 
-        local assistant_spinner = require("delphi.spinner").new({
-            bufnr = buf,
-            autohide_on_stop = true,
-            row = assistant_header_lnum - 1, -- extmark rows are 0-based
-            label = "Generating",
-            virt_text_pos = "right_align",
-        })
-        assistant_spinner:start()
+		local assistant_spinner = require("delphi.spinner").new({
+			bufnr = buf,
+			autohide_on_stop = true,
+			row = assistant_header_lnum - 1, -- extmark rows are 0-based
+			label = "Generating",
+			virt_text_pos = "right_align",
+		})
+		assistant_spinner:start()
 
 		local default_model
 		if M.opts.allow_env_var_config and os.getenv("DELPHI_DEFAULT_CHAT_MODEL") then
@@ -176,28 +176,28 @@ local function setup_chat_cmd(config)
 			messages = new_messages,
 			temperature = temperature,
 		}, {
-            on_chunk = function(chunk, is_done)
-                if is_done then
-                    if assistant_spinner then
-                        assistant_spinner:stop()
-                    end
-                    P.append_line_to_buf(buf, "")
-                    P.append_line_to_buf(buf, P.headers.user .. " ")
-                    P.append_line_to_buf(buf, "")
-                    P.set_cursor_to_user(buf)
-                    P.save_chat(buf)
-                    return
-                end
-                P.append_chunk_to_buf(buf, get_delta(chunk))
-            end,
+			on_chunk = function(chunk, is_done)
+				if is_done then
+					if assistant_spinner then
+						assistant_spinner:stop()
+					end
+					P.append_line_to_buf(buf, "")
+					P.append_line_to_buf(buf, P.headers.user .. " ")
+					P.append_line_to_buf(buf, "")
+					P.set_cursor_to_user(buf)
+					P.save_chat(buf)
+					return
+				end
+				P.append_chunk_to_buf(buf, get_delta(chunk))
+			end,
 
-            on_error = function(err)
-                if assistant_spinner then
-                    assistant_spinner:stop()
-                end
-                vim.notify(err)
-            end,
-        })
+			on_error = function(err)
+				if assistant_spinner then
+					assistant_spinner:stop()
+				end
+				vim.notify(err)
+			end,
+		})
 	end, { nargs = "*" })
 end
 
@@ -210,7 +210,6 @@ local function setup_rewrite_cmd(config)
 		end
 
 		P.show_popup("Rewrite prompt", function(user_prompt)
-			vim.notify(user_prompt)
 			if user_prompt == "" then
 				vim.notify("Empty prompt")
 				return
@@ -232,14 +231,14 @@ local function setup_rewrite_cmd(config)
 				vim.notify("Coudln't find model " .. tostring(default_model), vim.log.levels.ERROR)
 				return
 			end
-            local think_spinner = require("delphi.spinner").new({
-                bufnr = vim.api.nvim_get_current_buf(),
-                autohide_on_stop = true,
-                -- spinner row is 0-based; anchor to the top line of the region
-                row = sel.start_lnum - 1,
-                label = "Generating",
-                virt_text_pos = "right_align",
-            })
+			local think_spinner = require("delphi.spinner").new({
+				bufnr = vim.api.nvim_get_current_buf(),
+				autohide_on_stop = true,
+				-- spinner row is 0-based; anchor to the top line of the region
+				row = sel.start_lnum - 1,
+				label = "Generating",
+				virt_text_pos = "right_align",
+			})
 			think_spinner:start()
 			local rewrite_prompt = P.build_rewrite_prompt(orig_buf, sel.start_lnum, sel.end_lnum, user_prompt)
 
@@ -279,9 +278,9 @@ local function setup_rewrite_cmd(config)
 				on_error = function() end,
 			})
 		end)
-    end, { range = true, desc = "LLM-rewrite the current visual selection or insert-at-cursor" })
-    -- Define <Plug> mappings once so users can bind ergonomically
-    P.apply_rewrite_plug_mappings()
+	end, { range = true, desc = "LLM-rewrite the current visual selection or insert-at-cursor" })
+	-- Define <Plug> mappings once so users can bind ergonomically
+	P.apply_rewrite_plug_mappings()
 end
 
 ---Setup delphi
