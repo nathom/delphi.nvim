@@ -243,6 +243,23 @@ function P.open_new_chat_buffer(system_prompt, model_name, temperature)
 	}
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
 
+	-- Enable cmp source for @-file mentions in this chat buffer, if available
+	local ok_cmp, cmp = pcall(require, "cmp")
+	if ok_cmp then
+		local sources = cmp.get_config().sources or {}
+		local has_delphi = false
+		for _, s in ipairs(sources) do
+			if s.name == "delphi_path" then
+				has_delphi = true
+				break
+			end
+		end
+		if not has_delphi then
+			sources = vim.list_extend({ { name = "delphi_path" } }, sources)
+		end
+		cmp.setup.buffer({ sources = sources })
+	end
+
 	P.set_cursor_to_user(buf) -- jump to User prompt
 	vim.cmd("startinsert")
 	return buf
@@ -290,6 +307,24 @@ function P.open_chat_file(path)
 	vim.b.is_delphi_chat = true
 	vim.b.delphi_chat_path = path
 	vim.b.delphi_meta_path = path:gsub("%.md$", "_meta.json")
+
+	-- Enable cmp source for @-file mentions in this chat buffer, if available
+	local ok_cmp, cmp = pcall(require, "cmp")
+	if ok_cmp then
+		local sources = cmp.get_config().sources or {}
+		local has_delphi = false
+		for _, s in ipairs(sources) do
+			if s.name == "delphi_path" then
+				has_delphi = true
+				break
+			end
+		end
+		if not has_delphi then
+			sources = vim.list_extend({ { name = "delphi_path" } }, sources)
+		end
+		cmp.setup.buffer({ sources = sources })
+	end
+
 	P.set_cursor_to_user(buf)
 	return buf
 end
