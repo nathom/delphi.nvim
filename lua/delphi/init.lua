@@ -142,9 +142,20 @@ local function setup_chat_cmd(config)
 
 		P.write_chat_meta(vim.b.delphi_chat_path, new_meta)
 
-		P.append_line_to_buf(buf, "")
-		P.append_line_to_buf(buf, P.headers.assistant)
-		P.append_line_to_buf(buf, "")
+        -- Add assistant header and start a right-aligned spinner on that line
+        P.append_line_to_buf(buf, "")
+        P.append_line_to_buf(buf, P.headers.assistant)
+        local assistant_header_lnum = vim.api.nvim_buf_line_count(buf) -- 1-based
+        P.append_line_to_buf(buf, "")
+
+        local assistant_spinner = require("delphi.spinner").new({
+            bufnr = buf,
+            autohide_on_stop = true,
+            row = assistant_header_lnum - 1, -- extmark rows are 0-based
+            label = "Generating",
+            virt_text_pos = "right_align",
+        })
+        assistant_spinner:start()
 
 		local default_model
 		if M.opts.allow_env_var_config and os.getenv("DELPHI_DEFAULT_CHAT_MODEL") then
@@ -165,20 +176,28 @@ local function setup_chat_cmd(config)
 			messages = new_messages,
 			temperature = temperature,
 		}, {
-			on_chunk = function(chunk, is_done)
-				if is_done then
-					P.append_line_to_buf(buf, "")
-					P.append_line_to_buf(buf, P.headers.user .. " ")
-					P.append_line_to_buf(buf, "")
-					P.set_cursor_to_user(buf)
-					P.save_chat(buf)
-					return
-				end
-				P.append_chunk_to_buf(buf, get_delta(chunk))
-			end,
+            on_chunk = function(chunk, is_done)
+                if is_done then
+                    if assistant_spinner then
+                        assistant_spinner:stop()
+                    end
+                    P.append_line_to_buf(buf, "")
+                    P.append_line_to_buf(buf, P.headers.user .. " ")
+                    P.append_line_to_buf(buf, "")
+                    P.set_cursor_to_user(buf)
+                    P.save_chat(buf)
+                    return
+                end
+                P.append_chunk_to_buf(buf, get_delta(chunk))
+            end,
 
-			on_error = vim.notify,
-		})
+            on_error = function(err)
+                if assistant_spinner then
+                    assistant_spinner:stop()
+                end
+                vim.notify(err)
+            end,
+        })
 	end, { nargs = "*" })
 end
 
