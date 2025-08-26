@@ -12,7 +12,7 @@
 - Clean and snappy Vim buffer based chat interface
 - Local storage for chat history, with optional [Telescope](https://github.com/nvim-telescope/telescope.nvim) integration
 - Code rewrite and insert-at-cursor with live diff preview
-- Live streaming of tokens
+- Zero startup time cost (with lazy.nvim)
 - Pure Lua OpenAI client and diff algorithm
 
 
