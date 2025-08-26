@@ -61,7 +61,6 @@
                     { "<leader>k", "<Plug>(DelphiInsertAtCursor)", mode = { "n", "i" }, desc = "Delphi: insert at cursor" },
                     { "<leader>a", "<Plug>(DelphiRewriteAccept)", desc = "Delphi: accept rewrite" },
                     { "<leader>R", "<Plug>(DelphiRewriteReject)", desc = "Delphi: reject rewrite" },
-                    { "<Esc><Esc>", "<Plug>(DelphiPromptCancel)", mode = { "n", "i" }, desc = "Delphi: cancel prompt" },
                   },
                   cmd = { "Chat", "Rewrite" },
                   opts = {
