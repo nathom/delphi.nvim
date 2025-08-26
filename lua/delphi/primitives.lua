@@ -475,24 +475,42 @@ function P.start_ghost_diff(buf, start_lnum, end_lnum, left_lines)
 			return
 		end
 
+		-- To maintain correct visual order of added lines, render contiguous
+		-- runs of '+' as a single virt_lines block instead of one extmark per line.
+		local pending_adds = {}
+		local function flush_adds()
+			if #pending_adds == 0 then
+				return
+			end
+			local virt_lines = {}
+			for _, t in ipairs(pending_adds) do
+				virt_lines[#virt_lines + 1] = { { t, "DiffAdd" } }
+			end
+			vim.api.nvim_buf_set_extmark(buf, ghost_ns, row, 0, {
+				virt_lines = virt_lines,
+				virt_lines_above = false,
+			})
+			pending_adds = {}
+		end
+
 		for _, l in ipairs(lines) do
 			local tag = l:sub(1, 1)
 			local text = l:sub(3)
 			if tag == " " then
+				flush_adds()
 				row = row + 1
 			elseif tag == "-" then
+				flush_adds()
 				vim.api.nvim_buf_set_extmark(buf, ghost_ns, row, 0, {
 					virt_text = { { text, "DiffDelete" } },
 					virt_text_pos = "overlay",
 				})
 				row = row + 1
 			elseif tag == "+" then
-				vim.api.nvim_buf_set_extmark(buf, ghost_ns, row, 0, {
-					virt_lines = { { { text, "DiffAdd" } } },
-					virt_lines_above = false,
-				})
+				pending_adds[#pending_adds + 1] = text
 			end
 		end
+		flush_adds()
 	end
 
 	return {
