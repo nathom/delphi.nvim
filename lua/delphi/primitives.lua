@@ -545,26 +545,26 @@ end
 ---Ensure <Plug>-style mappings for Rewrite/Insert exist.
 ---@return nil
 function P.apply_rewrite_plug_mappings()
-    if vim.g.delphi_rewrite_plugs_applied then
-        return
-    end
-    vim.g.delphi_rewrite_plugs_applied = true
+	if vim.g.delphi_rewrite_plugs_applied then
+		return
+	end
+	vim.g.delphi_rewrite_plugs_applied = true
 
-    -- Visual/Select: rewrite the current selection
-    vim.keymap.set({ "x", "s" }, "<Plug>(DelphiRewriteSelection)", ":<C-u>Rewrite<CR>", {
-        desc = "Delphi: rewrite selection",
-        silent = true,
-    })
+	-- Visual/Select: rewrite the current selection
+	vim.keymap.set({ "x", "s" }, "<Plug>(DelphiRewriteSelection)", ":<C-u>Rewrite<CR>", {
+		desc = "Delphi: rewrite selection",
+		silent = true,
+	})
 
-    -- Normal/Insert: insert at cursor (single-line mode)
-    vim.keymap.set("n", "<Plug>(DelphiInsertAtCursor)", ":Rewrite<CR>", {
-        desc = "Delphi: insert at cursor",
-        silent = true,
-    })
-    vim.keymap.set("i", "<Plug>(DelphiInsertAtCursor)", "<C-o>:Rewrite<CR>", {
-        desc = "Delphi: insert at cursor",
-        silent = true,
-    })
+	-- Normal/Insert: insert at cursor (single-line mode)
+	vim.keymap.set("n", "<Plug>(DelphiInsertAtCursor)", ":Rewrite<CR>", {
+		desc = "Delphi: insert at cursor",
+		silent = true,
+	})
+	vim.keymap.set("i", "<Plug>(DelphiInsertAtCursor)", "<C-o>:Rewrite<CR>", {
+		desc = "Delphi: insert at cursor",
+		silent = true,
+	})
 end
 
 -- chat metadata helpers ------------------------------------------------------
