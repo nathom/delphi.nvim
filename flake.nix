@@ -56,7 +56,9 @@
                   dependencies = { "nvim-lua/plenary.nvim", "nvim-telescope/telescope.nvim", "hrsh7th/nvim-cmp", "hrsh7th/cmp-path"},
                   keys = {
                     { "<leader><cr>", "<Plug>(DelphiChatSend)", desc = "Delphi: send chat" },
-                    { "<leader>r", "<Plug>(DelphiRewriteSelection)", mode = "x", desc = "Delphi: rewrite selection" },
+                    -- Ergonomic rewrite/insert: <leader>k
+                    { "<leader>k", "<Plug>(DelphiRewriteSelection)", mode = { "x", "s" }, desc = "Delphi: rewrite selection" },
+                    { "<leader>k", "<Plug>(DelphiInsertAtCursor)", mode = { "n", "i" }, desc = "Delphi: insert at cursor" },
                     { "<leader>a", "<Plug>(DelphiRewriteAccept)", desc = "Delphi: accept rewrite" },
                     { "<leader>R", "<Plug>(DelphiRewriteReject)", desc = "Delphi: reject rewrite" },
                     { "<Esc><Esc>", "<Plug>(DelphiPromptCancel)", mode = { "n", "i" }, desc = "Delphi: cancel prompt" },

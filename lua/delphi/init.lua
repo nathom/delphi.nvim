@@ -213,13 +213,14 @@ local function setup_rewrite_cmd(config)
 				vim.notify("Coudln't find model " .. tostring(default_model), vim.log.levels.ERROR)
 				return
 			end
-			local think_spinner = require("delphi.spinner").new({
-				bufnr = vim.api.nvim_get_current_buf(),
-				autohide_on_stop = true,
-				row = sel.start_lnum,
-				label = "Generating",
-				virt_text_pos = "right_align",
-			})
+            local think_spinner = require("delphi.spinner").new({
+                bufnr = vim.api.nvim_get_current_buf(),
+                autohide_on_stop = true,
+                -- spinner row is 0-based; anchor to the top line of the region
+                row = sel.start_lnum - 1,
+                label = "Generating",
+                virt_text_pos = "right_align",
+            })
 			think_spinner:start()
 			local rewrite_prompt = P.build_rewrite_prompt(orig_buf, sel.start_lnum, sel.end_lnum, user_prompt)
 
@@ -259,13 +260,9 @@ local function setup_rewrite_cmd(config)
 				on_error = function() end,
 			})
 		end)
-	end, { range = true, desc = "LLM-rewrite the current visual selection" })
-	vim.keymap.set(
-		"x",
-		"<Plug>(DelphiRewriteSelection)",
-		":Rewrite<cr>",
-		{ desc = "Delphi: rewrite selection", silent = true }
-	)
+    end, { range = true, desc = "LLM-rewrite the current visual selection or insert-at-cursor" })
+    -- Define <Plug> mappings once so users can bind ergonomically
+    P.apply_rewrite_plug_mappings()
 end
 
 ---Setup delphi
