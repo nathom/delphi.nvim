@@ -422,6 +422,12 @@ function P.show_popup(label, cb)
 			vim.cmd("startinsert!")
 		end
 	end)
+	vim.keymap.set(
+		{ "n", "i" },
+		"<ESC><ESC>",
+		"<Plug>(DelphiPromptCancel)",
+		{ buffer = buf, noremap = true, silent = true, desc = "Delphi: cancel prompt" }
+	)
 	vim.keymap.set({ "n", "i" }, "<Plug>(DelphiPromptCancel)", function()
 		vim.api.nvim_win_close(win, true)
 		cb("")
@@ -432,53 +438,133 @@ end
 
 local ghost_ns = vim.api.nvim_create_namespace("delphi_ghost_diff")
 
+---Start a ghost diff overlay for live preview while streaming new content.
+---@param buf integer            Buffer handle
+---@param start_lnum integer     1-based, inclusive start line of selection/insert
+---@param end_lnum integer       1-based, inclusive end line of selection/insert
+---@param left_lines string[]    Original selected lines (empty for insert)
+---@return { push: fun(tok:string), accept: fun(), reject: fun() }
 function P.start_ghost_diff(buf, start_lnum, end_lnum, left_lines)
 	local Differ = require("delphi.patience").Differ
 	local d = Differ:new()
 	local right_text = ""
+	local is_insert = (start_lnum == end_lnum)
 
+	---Render the diff preview. For insert-at (single-line), render as a simple
+	---append preview without running a diff to avoid noisy overlays.
+	---@param lines string[]  -- difflib-style lines when not insert mode
 	local function render(lines)
 		-- There's probably a way to optimize this
 		vim.api.nvim_buf_clear_namespace(buf, ghost_ns, 0, -1)
 
 		local row = start_lnum - 1
+
+		if is_insert then
+			-- Simple insert preview: show all new lines as additions at the insert point
+			local right_lines = vim.split(right_text, "\n", { plain = true, trimempty = false })
+			local virt_lines = {}
+			for _, rl in ipairs(right_lines) do
+				virt_lines[#virt_lines + 1] = { { rl, "DiffAdd" } }
+			end
+			if #virt_lines > 0 then
+				vim.api.nvim_buf_set_extmark(buf, ghost_ns, row, 0, {
+					virt_lines = virt_lines,
+					virt_lines_above = false,
+				})
+			end
+			return
+		end
+
+		-- To maintain correct visual order of added lines, render contiguous
+		-- runs of '+' as a single virt_lines block instead of one extmark per line.
+		local pending_adds = {}
+		local function flush_adds()
+			if #pending_adds == 0 then
+				return
+			end
+			local virt_lines = {}
+			for _, t in ipairs(pending_adds) do
+				virt_lines[#virt_lines + 1] = { { t, "DiffAdd" } }
+			end
+			vim.api.nvim_buf_set_extmark(buf, ghost_ns, row, 0, {
+				virt_lines = virt_lines,
+				virt_lines_above = false,
+			})
+			pending_adds = {}
+		end
+
 		for _, l in ipairs(lines) do
 			local tag = l:sub(1, 1)
 			local text = l:sub(3)
 			if tag == " " then
+				flush_adds()
 				row = row + 1
 			elseif tag == "-" then
+				flush_adds()
 				vim.api.nvim_buf_set_extmark(buf, ghost_ns, row, 0, {
 					virt_text = { { text, "DiffDelete" } },
 					virt_text_pos = "overlay",
-					hl_mode = "combine",
 				})
 				row = row + 1
 			elseif tag == "+" then
-				vim.api.nvim_buf_set_extmark(buf, ghost_ns, row, 0, {
-					virt_lines = { { { text, "DiffAdd" } } },
-					virt_lines_above = true,
-				})
+				pending_adds[#pending_adds + 1] = text
 			end
 		end
+		flush_adds()
 	end
 
 	return {
 		push = function(tok)
 			right_text = right_text .. tok
-			local right_lines = vim.split(right_text, "\n", { plain = true, trimempty = false })
-			render(d:compare(left_lines, right_lines))
+			if is_insert then
+				-- No diffing; just render the insertion preview
+				render({})
+			else
+				local right_lines = vim.split(right_text, "\n", { plain = true, trimempty = false })
+				render(d:compare(left_lines, right_lines))
+			end
 		end,
 		accept = function()
 			local lines = vim.split(right_text, "\n", { plain = true, trimempty = true })
 			pcall(vim.cmd, "undojoin")
-			vim.api.nvim_buf_set_lines(buf, start_lnum - 1, end_lnum, false, lines)
+			if is_insert then
+				-- Insert without replacing existing content
+				vim.api.nvim_buf_set_lines(buf, start_lnum - 1, start_lnum - 1, false, lines)
+			else
+				-- Replace selection with rewritten content
+				vim.api.nvim_buf_set_lines(buf, start_lnum - 1, end_lnum, false, lines)
+			end
 			vim.api.nvim_buf_clear_namespace(buf, ghost_ns, 0, -1)
 		end,
 		reject = function()
 			vim.api.nvim_buf_clear_namespace(buf, ghost_ns, 0, -1)
 		end,
 	}
+end
+
+---Ensure <Plug>-style mappings for Rewrite/Insert exist.
+---@return nil
+function P.apply_rewrite_plug_mappings()
+    if vim.g.delphi_rewrite_plugs_applied then
+        return
+    end
+    vim.g.delphi_rewrite_plugs_applied = true
+
+    -- Visual/Select: rewrite the current selection
+    vim.keymap.set({ "x", "s" }, "<Plug>(DelphiRewriteSelection)", ":<C-u>Rewrite<CR>", {
+        desc = "Delphi: rewrite selection",
+        silent = true,
+    })
+
+    -- Normal/Insert: insert at cursor (single-line mode)
+    vim.keymap.set("n", "<Plug>(DelphiInsertAtCursor)", ":Rewrite<CR>", {
+        desc = "Delphi: insert at cursor",
+        silent = true,
+    })
+    vim.keymap.set("i", "<Plug>(DelphiInsertAtCursor)", "<C-o>:Rewrite<CR>", {
+        desc = "Delphi: insert at cursor",
+        silent = true,
+    })
 end
 
 -- chat metadata helpers ------------------------------------------------------
@@ -619,6 +705,66 @@ function P.chat_invalidated(cur_lines, meta)
 		end
 	end
 	return false
+end
+
+---Adds `<rewrite_this>...</rewrite_this>` or `<insert_here></insert_here>` markers.
+---@param lines string[]  -- original buffer lines
+---@param start_lnum integer -- 1-based, inclusive
+---@param end_lnum integer   -- 1-based, inclusive
+---@return string[]          -- copy with markers inserted
+local function add_rewrite_markers(lines, start_lnum, end_lnum)
+	local ret = {}
+
+	for i = 1, start_lnum - 1 do
+		ret[#ret + 1] = lines[i]
+	end
+
+	if start_lnum == end_lnum then
+		ret[#ret + 1] = "<insert_here></insert_here>"
+		for i = start_lnum, #lines do
+			ret[#ret + 1] = lines[i]
+		end
+	else
+		ret[#ret + 1] = "<rewrite_this>"
+		for i = start_lnum, end_lnum do
+			ret[#ret + 1] = lines[i]
+		end
+		ret[#ret + 1] = "</rewrite_this>"
+		for i = end_lnum + 1, #lines do
+			ret[#ret + 1] = lines[i]
+		end
+	end
+
+	return ret
+end
+---Build a rewrite prompt for a document range
+---@param buf integer buffer id
+---@param start_lnum integer 1-based start line (inclusive)
+---@param end_lnum integer 1-based end line (inclusive)
+---@param prompt string user's prompt describing the desired change
+---@return string prompt built for the rewrite
+function P.build_rewrite_prompt(buf, start_lnum, end_lnum, prompt)
+	local ft = vim.bo[buf].filetype
+	local content_type
+	if ft == "markdown" or ft == "text" or ft == nil then
+		content_type = "text"
+	else
+		content_type = "code"
+	end
+	-- TODO: put a length limit
+	local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+	local doc_w_markers = add_rewrite_markers(lines, start_lnum, end_lnum)
+	local rewrite_lines = vim.api.nvim_buf_get_lines(buf, start_lnum - 1, end_lnum, false)
+
+	return require("delphi.rewrite").build_prompt({
+		content_type = content_type,
+		language_name = ft,
+		document_content = table.concat(doc_w_markers, "\n"),
+		is_insert = start_lnum == end_lnum,
+		is_truncated = false,
+		user_prompt = prompt,
+		rewrite_section = table.concat(rewrite_lines, "\n"),
+	})
 end
 
 return P

@@ -5,7 +5,7 @@ local P = require("delphi.primitives")
 ---@field models table<string, Model>
 ---@field allow_env_var_config boolean
 ---@field chat { system_prompt: string, default_model: string?, headers: { system: string, user: string, assistant: string } }
----@field rewrite { system_prompt: string, default_model: string?, prompt_template: string }
+---@field rewrite { default_model: string? }
 local default_opts = {
 	models = {},
 	allow_env_var_config = false,
@@ -20,23 +20,9 @@ local default_opts = {
 	},
 	rewrite = {
 		default_model = nil,
-		system_prompt = [[
-You are Delphi, an expert refactoring assistant. You ALWAYS respond with the rewritten code or text enclosed in <delphi:refactored_code> tags:
-<delphi:refactored_code>
-...
-</delphi:refactored_code>]],
-		prompt_template = [[
-Full file for context:
-<delphi:current_file>
-{{file_text}}
-</delphi:current_file>
-
-Selected lines ({{selection_start_lnum}}:{{selection_end_lnum}}):
-<delphi:selected_lines>
-{{selected_text}}
-</delphi:selected_lines>
-
-Instruction: {{user_instructions}}. Return ONLY the refactored code inside <delphi:refactored_code> tags. Preserve formatting unless told otherwise. Try to keep the diff minimal while following the instructions exactly.]],
+		accept_keymap = "<leader>a",
+		reject_keymap = "<leader>r",
+		global_rewrite_keymap = "<leader>r",
 	},
 }
 local M = { opts = default_opts }
@@ -203,7 +189,6 @@ local function setup_rewrite_cmd(config)
 		if #sel.lines == 0 then
 			return vim.notify("No visual selection found.", vim.log.levels.WARN)
 		end
-		local file_lines = vim.api.nvim_buf_get_lines(orig_buf, 0, -1, false)
 
 		P.show_popup("Rewrite prompt", function(user_prompt)
 			vim.notify(user_prompt)
@@ -211,14 +196,6 @@ local function setup_rewrite_cmd(config)
 				vim.notify("Empty prompt")
 				return
 			end -- cancelled
-
-			local env = {
-				file_text = table.concat(file_lines, "\n"),
-				selected_text = table.concat(sel.lines, "\n"),
-				selection_start_lnum = sel.start_lnum,
-				selection_end_lnum = sel.end_lnum,
-				user_instructions = user_prompt,
-			}
 
 			-- simple fence-aware streaming state
 			local Extractor = require("delphi.extractor").Extractor
@@ -236,12 +213,21 @@ local function setup_rewrite_cmd(config)
 				vim.notify("Coudln't find model " .. tostring(default_model), vim.log.levels.ERROR)
 				return
 			end
+            local think_spinner = require("delphi.spinner").new({
+                bufnr = vim.api.nvim_get_current_buf(),
+                autohide_on_stop = true,
+                -- spinner row is 0-based; anchor to the top line of the region
+                row = sel.start_lnum - 1,
+                label = "Generating",
+                virt_text_pos = "right_align",
+            })
+			think_spinner:start()
+			local rewrite_prompt = P.build_rewrite_prompt(orig_buf, sel.start_lnum, sel.end_lnum, user_prompt)
 
 			openai.chat(model, {
 				stream = true,
 				messages = {
-					{ role = "system", content = M.opts.rewrite.system_prompt },
-					{ role = "user", content = P.template(M.opts.rewrite.prompt_template, env) },
+					{ role = "user", content = rewrite_prompt },
 				},
 			}, {
 				on_chunk = function(chunk, is_done)
@@ -263,7 +249,7 @@ local function setup_rewrite_cmd(config)
 							desc = "Delphi: reject rewrite",
 							silent = true,
 						})
-						return
+						think_spinner:stop()
 					end
 					local new_code = extractor:update(get_delta(chunk))
 					if #new_code then
@@ -274,13 +260,9 @@ local function setup_rewrite_cmd(config)
 				on_error = function() end,
 			})
 		end)
-	end, { range = true, desc = "LLM-rewrite the current visual selection" })
-	vim.keymap.set(
-		"x",
-		"<Plug>(DelphiRewriteSelection)",
-		":Rewrite<cr>",
-		{ desc = "Delphi: rewrite selection", silent = true }
-	)
+    end, { range = true, desc = "LLM-rewrite the current visual selection or insert-at-cursor" })
+    -- Define <Plug> mappings once so users can bind ergonomically
+    P.apply_rewrite_plug_mappings()
 end
 
 ---Setup delphi

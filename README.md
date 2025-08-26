@@ -10,8 +10,8 @@
 ## Features
 
 - Clean and snappy Vim buffer based chat interface
-- Local storage for chat history, with [Telescope](https://github.com/nvim-telescope/telescope.nvim) integration
-- Code rewrite command with unified diff
+- Local storage for chat history, with optional [Telescope](https://github.com/nvim-telescope/telescope.nvim) integration
+- Code rewrite and insert-at-cursor with live diff preview
 - Live streaming of tokens
 - Pure Lua OpenAI client and diff algorithm
 
@@ -19,37 +19,35 @@
 ## Setup 
 
 You'll need a plugin manager (such as [lazy](https://github.com/folke/lazy.nvim)), and an OpenAI compatible
-LLM API (such as [OpenRouter](https://openrouter.ai)).
+LLM API (such as [OpenRouter](https://openrouter.ai)). If you want the chat history picker, install Telescope and load the extension.
 
 Example configuration with lazy.nvim:
 
 ```lua
 {
-        "nathom/delphi.nvim",
-        keys = {
-                { "<leader><cr>", "<Plug>(DelphiChatSend)", desc = "Delphi: send chat" },
-                { "<leader>r", "<Plug>(DelphiRewriteSelection)", mode = "x", desc = "Delphi: rewrite selection" },
-                { "<leader>a", "<Plug>(DelphiRewriteAccept)", desc = "Delphi: accept rewrite" },
-                { "<leader>R", "<Plug>(DelphiRewriteReject)", desc = "Delphi: reject rewrite" },
-                { "<Esc><Esc>", "<Plug>(DelphiPromptCancel)", mode = { "n", "i" }, desc = "Delphi: cancel prompt" },
-        },
-        opts = {
-                chat = { default_model = "gemini_25" },
-                rewrite = { default_model = "kimi_k2" },
-                models = {
-			gemini_25 = {
-				base_url = "https://openrouter.ai/api/v1",
-				api_key_env_var = "OPENROUTER_API_KEY",
-				model_name = "google/gemini-2.5-pro",
-			},
-			kimi_k2 = {
-				base_url = "https://openrouter.ai/api/v1",
-				api_key_env_var = "OPENROUTER_API_KEY",
-				model_name = "moonshotai/kimi-k2",
-			},
-		},
-	},
-	dependencies = { "nvim-lua/plenary.nvim" },
+  "nathom/delphi.nvim",
+  keys = {
+    { "<leader><cr>", "<Plug>(DelphiChatSend)", desc = "Delphi: send chat" },
+    { "<C-i>", "<Plug>(DelphiRewriteSelection)", mode = { "x", "s" }, desc = "Delphi: rewrite selection" },
+    { "<C-i>", "<Plug>(DelphiInsertAtCursor)", mode = { "n", "i" }, desc = "Delphi: insert at cursor" },
+    { "<leader>a", "<Plug>(DelphiRewriteAccept)", desc = "Delphi: accept rewrite" },
+    { "<leader>R", "<Plug>(DelphiRewriteReject)", desc = "Delphi: reject rewrite" },
+  },
+  opts = {
+    chat = { default_model = "gemini_flash" },
+    rewrite = { default_model = "gemini_flash" },
+    models = {
+      gemini_flash = {
+        base_url = "https://openrouter.ai/api/v1",
+        api_key_env_var = "OPENROUTER_API_KEY",
+        model_name = "google/gemini-2.5-flash",
+      },
+    },
+  },
+  dependencies = { "nvim-lua/plenary.nvim", "nvim-telescope/telescope.nvim" },
+  init = function()
+    pcall(function() require('telescope').load_extension('delphi') end)
+  end,
 }
 ```
 
@@ -123,26 +121,31 @@ The system prompt can usually be left empty, as the provider will set a reasonab
 
 You have two options:
 
-- Use `:Telescope delphi chats`
+- Use `:Telescope delphi chats` (after loading the extension)
 - Run `:Chat list` to view the ids and titles of chats, and `:Chat go <id>` to open them
 
 ### Rewrite
 
-This command allows the LLM to rewrite a selected block of code according
-to your instructions. It will display a unified diff, which is updated as
-tokens are streamed in.
+This command allows the LLM to rewrite a selected block of code or insert at the cursor.
+It displays a live diff preview as tokens stream in.
 
 To use it
 
 - open a buffer with some text
 - highlight a few lines in Visual Lines mode (shift-V)
-- trigger `<Plug>(DelphiRewriteSelection)`, which should open a popup
+- press `<C-i>` (or use `<Plug>(DelphiRewriteSelection)`) to open the prompt
 - instruct the model, hit `ENTER`
 - accept or reject the changes via `<Plug>(DelphiRewriteAccept)` or `<Plug>(DelphiRewriteReject)`
 
+Insert at cursor
+
+- from Normal or Insert mode, press `<C-i>` (or use `<Plug>(DelphiInsertAtCursor)`) to insert at the current line
+- the diff preview shows only additions; accepting applies the generated lines at the cursor line
+- press `<Esc><Esc>` inside the prompt popup to cancel (mapping is local to the popup only)
+
 ### Configuration
 
-These are the schema:
+Configuration schema:
 
 ```lua
 ---@class Model
@@ -155,43 +158,26 @@ These are the schema:
 ---@field models table<string, Model>
 ---@field allow_env_var_config boolean
 ---@field chat { system_prompt: string, default_model: string?, headers: { system: string, user: string, assistant: string } }
----@field rewrite { system_prompt: string, default_model: string?, prompt_template: string }
+---@field rewrite { default_model: string? }
 ```
 
-These are the default opts:
+Default options:
 
-````lua
+```lua
 opts = {
-	models = {},
-	allow_env_var_config = false,
-        chat = {
-                system_prompt = "",
-                default_model = nil,
-                headers = {
-                        system = "System:",
-                        user = "User:",
-                        assistant = "Assistant:",
-                },
-        },
-        rewrite = {
-                default_model = nil,
-                system_prompt = [[
-You are an expert refactoring assistant. You ALWAYS respond with the rewritten code or text enclosed in <delphi:refactored_code> tags:
-<delphi:refactored_code>
-...
-</delphi:refactored_code>]],
-                prompt_template = [[
-Full file for context:
-<delphi:current_file>
-{{file_text}}
-</delphi:current_file>
-
-Selected lines ({{selection_start_lnum}}:{{selection_end_lnum}}):
-<delphi:selected_lines>
-{{selected_text}}
-</delphi:selected_lines>
-
-Instruction: {{user_instructions}}. Return ONLY the refactored code inside <delphi:refactored_code> tags. Preserve formatting unless told otherwise. Try to keep the diff minimal while following the instructions exactly.]],
-        },
+  models = {},
+  allow_env_var_config = false,
+  chat = {
+    system_prompt = "",
+    default_model = nil,
+    headers = {
+      system = "System:",
+      user = "User:",
+      assistant = "Assistant:",
+    },
+  },
+  rewrite = {
+    default_model = nil,
+  },
 }
 ```
