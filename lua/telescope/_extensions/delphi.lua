@@ -34,8 +34,9 @@ function M.chats(opts)
 					if not ok then
 						lines = { "Couldn't read file " .. tostring(entry.value) }
 					end
-					vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, lines)
-					vim.bo[self.state.bufnr].filetype = "markdown"
+					local P = require("delphi.primitives")
+					P.buf_set_lines(self.state.bufnr, 0, -1, lines)
+					P.set_buf_option(self.state.bufnr, "filetype", "markdown")
 				end,
 			}),
 			layout_strategy = "vertical",

@@ -1,17 +1,19 @@
-local cmp = require("cmp")
-
 ---@class DelphiPathSource
 local source = {}
 
 ---Only enable this source inside Delphi chat buffers.
 ---@return boolean
 function source:is_available()
-	return vim.b.is_delphi_chat == true
+	local ok, P = pcall(require, "delphi.primitives")
+	if not ok then
+		return false
+	end
+	return P.get_bvar(nil, "is_delphi_chat", false) == true
 end
 
 ---Complete @file mentions by globbing paths that match the current token.
----@param params cmp.SourceCompletionApiParams
----@param callback fun(response: cmp.SourceCompletionResponse)
+---@param params table  -- cmp.SourceCompletionApiParams
+---@param callback fun(response: table) -- cmp.SourceCompletionResponse
 function source:complete(params, callback)
 	local line = params.context.cursor_before_line or ""
 	local col = params.context.cursor and params.context.cursor.col or #line
@@ -25,7 +27,15 @@ function source:complete(params, callback)
 
 	local pat = at .. "*"
 	---@type string[]
-	local paths = vim.fn.glob(pat, true, true)
+	local paths
+	do
+		local ok, P = pcall(require, "delphi.primitives")
+		if ok then
+			paths = P.glob(pat)
+		else
+			paths = {}
+		end
+	end
 	local items = {}
 	for _, p in ipairs(paths) do
 		-- Show and insert with leading '@'

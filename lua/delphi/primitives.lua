@@ -631,6 +631,15 @@ function P.apply_rewrite_plug_mappings()
 	})
 end
 
+---Apply chat buffer keymaps
+---@param buf integer
+function P.apply_chat_keymaps(buf)
+	local opts = { desc = "Delphi: send message", silent = true, buffer = buf }
+	P.keymap_set("n", "<Plug>(DelphiChatSend)", function()
+		vim.cmd([[Chat]])
+	end, opts)
+end
+
 ---Register the cmp source for delphi path completion once, on demand.
 ---@return nil
 function P.ensure_cmp_source_registered()
@@ -847,6 +856,112 @@ function P.build_rewrite_prompt(buf, start_lnum, end_lnum, prompt)
 		user_prompt = prompt,
 		rewrite_section = table.concat(rewrite_lines, "\n"),
 	})
+end
+
+-- Generic Vim API wrappers ---------------------------------------------------
+
+---Create a user command
+---@param name string
+---@param fn fun(opts: table)
+---@param opts table|nil
+function P.create_user_command(name, fn, opts)
+	vim.api.nvim_create_user_command(name, fn, opts or {})
+end
+
+---Set a keymap
+---@param mode string|string[]
+---@param lhs string
+---@param rhs string|function
+---@param opts table|nil
+function P.keymap_set(mode, lhs, rhs, opts)
+	vim.keymap.set(mode, lhs, rhs, opts or {})
+end
+
+---Get current buffer handle
+---@return integer
+function P.get_current_buf()
+	return vim.api.nvim_get_current_buf()
+end
+
+---Get all lines in range [start, finish) from a buffer
+---@param buf integer
+---@param start integer 0-based, inclusive
+---@param finish integer 0-based, exclusive (-1 for end)
+---@return string[]
+function P.buf_get_lines(buf, start, finish)
+	return vim.api.nvim_buf_get_lines(buf, start, finish, false)
+end
+
+---Get buffer line count
+---@param buf integer
+---@return integer
+function P.buf_line_count(buf)
+	return vim.api.nvim_buf_line_count(buf)
+end
+
+---Set lines in a buffer
+---@param buf integer
+---@param start integer 0-based inclusive
+---@param stop integer 0-based exclusive (-1 for end)
+---@param lines string[]
+function P.buf_set_lines(buf, start, stop, lines)
+	vim.api.nvim_buf_set_lines(buf, start, stop, false, lines)
+end
+
+---Set a buffer-local option (e.g., filetype)
+---@param buf integer
+---@param name string
+---@param value any
+function P.set_buf_option(buf, name, value)
+	vim.bo[buf][name] = value
+end
+
+---Set a buffer-local variable
+---@param buf integer|nil  current buffer if nil
+---@param key string
+---@param value any
+function P.set_bvar(buf, key, value)
+	if buf == nil then
+		vim.b[key] = value
+	else
+		vim.b[buf][key] = value
+	end
+end
+
+---Get a buffer-local variable
+---@param buf integer|nil  current buffer if nil
+---@param key string
+---@param default any
+---@return any
+function P.get_bvar(buf, key, default)
+	local ok, val
+	if buf == nil then
+		ok, val = pcall(function()
+			return vim.b[key]
+		end)
+	else
+		ok, val = pcall(function()
+			return vim.b[buf][key]
+		end)
+	end
+	if ok and val ~= nil then
+		return val
+	end
+	return default
+end
+
+---Glob filesystem paths (wrapper)
+---@param pattern string
+---@return string[]
+function P.glob(pattern)
+	return vim.fn.glob(pattern, true, true)
+end
+
+---Notify wrapper
+---@param msg string
+---@param level integer|nil
+function P.notify(msg, level)
+	vim.notify(msg, level)
 end
 
 return P

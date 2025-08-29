@@ -28,30 +28,13 @@ local default_opts = {
 }
 local M = { opts = default_opts }
 
----Set chat send keymap
----@param buf integer
-function M.apply_chat_keymaps(buf)
-	local opts = { desc = "Delphi: send message", silent = true, buffer = buf }
-	vim.keymap.set("n", "<Plug>(DelphiChatSend)", function()
-		vim.cmd([[Chat]])
-	end, opts)
-end
+-- All editor keymaps should be defined via primitives.
 
-local function get_delta(chunk)
-	if not chunk or not chunk.choices then
-		return ""
-	end
-	local delta = ""
-	local choice = chunk.choices[1]
-	if choice then
-		delta = choice.delta.content
-	end
-	return delta or ""
-end
+local get_delta = require("delphi.util").get_stream_delta
 
 local function setup_chat_cmd(config)
-	vim.api.nvim_create_user_command("Chat", function(opts)
-		local P = require("delphi.primitives")
+	local P = require("delphi.primitives")
+	P.create_user_command("Chat", function(opts)
 		local args = opts.fargs
 
 		if args[1] == "list" then
@@ -61,15 +44,15 @@ local function setup_chat_cmd(config)
 			return
 		elseif args[1] == "go" and args[2] then
 			local idx = tonumber(args[2])
-			if not idx then
-				return vim.notify("Invalid chat number")
-			end
+            if not idx then
+                return P.notify("Invalid chat number")
+            end
 			local entry = P.list_chats()[idx + 1]
-			if not entry then
-				return vim.notify("Chat not found")
-			end
+            if not entry then
+                return P.notify("Chat not found")
+            end
 			local b = P.open_chat_file(entry.path)
-			M.apply_chat_keymaps(b)
+			P.apply_chat_keymaps(b)
 			return
 		end
 
@@ -92,20 +75,21 @@ local function setup_chat_cmd(config)
 			end
 			local model_cfg = M.opts.models[default_model] or {}
 			local b = P.open_new_chat_buffer(config.system_prompt, default_model, model_cfg.temperature)
-			vim.b.is_delphi_chat = true
-			vim.b.delphi_chat_path = P.next_chat_path()
-			vim.b.delphi_meta_path = vim.b.delphi_chat_path:gsub("%.md$", "_meta.json")
+			local chat_path = P.next_chat_path()
+			P.set_bvar(b, "is_delphi_chat", true)
+			P.set_bvar(b, "delphi_chat_path", chat_path)
+			P.set_bvar(b, "delphi_meta_path", chat_path:gsub("%.md$", "_meta.json"))
 			P.save_chat(b)
-			M.apply_chat_keymaps(b)
+			P.apply_chat_keymaps(b)
 			return b
 		end
 
-		local buf = vim.api.nvim_get_current_buf()
+		local buf = P.get_current_buf()
 		if args[1] == "new" or orientation then
 			create_chat()
 			return
 		elseif args[1] ~= nil then
-			vim.notify("delphi: Invalid Chat subcommand " .. tostring(args[1]), vim.log.levels.ERROR)
+			P.notify("delphi: Invalid Chat subcommand " .. tostring(args[1]), vim.log.levels.ERROR)
 			return
 		end
 
@@ -114,7 +98,7 @@ local function setup_chat_cmd(config)
 			if existing then
 				P.set_current_buf(existing)
 				P.set_cursor_to_user(existing)
-				M.apply_chat_keymaps(existing)
+				P.apply_chat_keymaps(existing)
 				return
 			else
 				create_chat()
@@ -125,29 +109,30 @@ local function setup_chat_cmd(config)
 		local transcript = P.read_buf(buf)
 		local messages = P.to_messages(transcript)
 
-		local meta = P.read_chat_meta(vim.b.delphi_chat_path)
-		local cur_lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+		local chat_path = P.get_bvar(nil, "delphi_chat_path", "")
+		local meta = P.read_chat_meta(chat_path)
+		local cur_lines = P.buf_get_lines(buf, 0, -1)
 		local invalid = P.chat_invalidated(cur_lines, meta)
 		if invalid then
-			vim.notify("delphi: chat metadata file invalidated. resetting.", vim.log.levels.WARN)
-			P.reset_meta(vim.b.delphi_chat_path)
-			meta = P.read_chat_meta(vim.b.delphi_chat_path)
+			P.notify("delphi: chat metadata file invalidated. resetting.", vim.log.levels.WARN)
+			P.reset_meta(chat_path)
+			meta = P.read_chat_meta(chat_path)
 		end
 
 		local last_role = (#messages > 0) and messages[#messages].role or ""
 		if last_role ~= "user" then
-			return vim.notify("The last message must be from the User!")
+			return P.notify("The last message must be from the User!")
 		end
 
 		local new_meta, new_messages = P.resolve_tags(meta, messages)
 		new_meta.stored_lines = cur_lines
 
-		P.write_chat_meta(vim.b.delphi_chat_path, new_meta)
+		P.write_chat_meta(chat_path, new_meta)
 
 		-- Add assistant header and start a right-aligned spinner on that line
 		P.append_line_to_buf(buf, "")
 		P.append_line_to_buf(buf, P.headers.assistant)
-		local assistant_header_lnum = vim.api.nvim_buf_line_count(buf) -- 1-based
+		local assistant_header_lnum = P.buf_line_count(buf) -- 1-based
 		P.append_line_to_buf(buf, "")
 
 		local assistant_spinner = require("delphi.spinner").new({
@@ -169,7 +154,7 @@ local function setup_chat_cmd(config)
 		local model_name = fm.model or default_model
 		local model = M.opts.models[model_name]
 		if model == nil then
-			vim.notify("Coudln't find model " .. tostring(model_name), vim.log.levels.ERROR)
+			P.notify("Coudln't find model " .. tostring(model_name), vim.log.levels.ERROR)
 			return
 		end
 		local temperature = fm.temperature or model.temperature
@@ -198,24 +183,24 @@ local function setup_chat_cmd(config)
 				if assistant_spinner then
 					assistant_spinner:stop()
 				end
-				vim.notify(err)
+				P.notify(err)
 			end,
 		})
 	end, { nargs = "*" })
 end
 
 local function setup_rewrite_cmd(config)
-	vim.api.nvim_create_user_command("Rewrite", function()
-		local P = require("delphi.primitives")
-		local orig_buf = vim.api.nvim_get_current_buf()
+	local P = require("delphi.primitives")
+	P.create_user_command("Rewrite", function()
+		local orig_buf = P.get_current_buf()
 		local sel = P.get_visual_selection(orig_buf)
 		if #sel.lines == 0 then
-			return vim.notify("No visual selection found.", vim.log.levels.WARN)
+			return P.notify("No visual selection found.", vim.log.levels.WARN)
 		end
 
 		P.show_popup("Rewrite prompt", function(user_prompt)
 			if user_prompt == "" then
-				vim.notify("Empty prompt")
+				P.notify("Empty prompt")
 				return
 			end -- cancelled
 
@@ -232,11 +217,11 @@ local function setup_rewrite_cmd(config)
 			end
 			local model = M.opts.models[default_model]
 			if not model then
-				vim.notify("Coudln't find model " .. tostring(default_model), vim.log.levels.ERROR)
+				P.notify("Coudln't find model " .. tostring(default_model), vim.log.levels.ERROR)
 				return
 			end
 			local think_spinner = require("delphi.spinner").new({
-				bufnr = vim.api.nvim_get_current_buf(),
+				bufnr = P.get_current_buf(),
 				autohide_on_stop = true,
 				-- spinner row is 0-based; anchor to the top line of the region
 				row = sel.start_lnum - 1,
@@ -255,23 +240,14 @@ local function setup_rewrite_cmd(config)
 			}, {
 				on_chunk = function(chunk, is_done)
 					if is_done then
-						local map = vim.keymap.set
-						map("n", "<Plug>(DelphiRewriteAccept)", function()
+						P.keymap_set("n", "<Plug>(DelphiRewriteAccept)", function()
 							diff.accept()
-							vim.notify("applied")
-						end, {
-							buffer = orig_buf,
-							desc = "Delphi: accept rewrite",
-							silent = true,
-						})
-						map("n", "<Plug>(DelphiRewriteReject)", function()
+							P.notify("applied")
+						end, { buffer = orig_buf, desc = "Delphi: accept rewrite", silent = true })
+						P.keymap_set("n", "<Plug>(DelphiRewriteReject)", function()
 							diff.reject()
-							vim.notify("rejected")
-						end, {
-							buffer = orig_buf,
-							desc = "Delphi: reject rewrite",
-							silent = true,
-						})
+							P.notify("rejected")
+						end, { buffer = orig_buf, desc = "Delphi: reject rewrite", silent = true })
 						think_spinner:stop()
 					end
 					local new_code = extractor:update(get_delta(chunk))
@@ -284,9 +260,9 @@ local function setup_rewrite_cmd(config)
 			})
 		end)
 	end, { range = true, desc = "LLM-rewrite the current visual selection or insert-at-cursor" })
-    -- Define <Plug> mappings once so users can bind ergonomically
-    require("delphi.primitives").apply_rewrite_plug_mappings()
-    end
+	-- Define <Plug> mappings once so users can bind ergonomically
+	require("delphi.primitives").apply_rewrite_plug_mappings()
+end
 
 ---Setup delphi
 ---@param opts Config
