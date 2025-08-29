@@ -35,7 +35,7 @@ Example configuration with lazy.nvim:
   },
   cmd = { "Chat", "Rewrite" },
   opts = {
-    chat = { default_model = "gemini_flash" },
+    chat = { default_model = "gemini_flash", scroll_on_send = true },
     rewrite = { default_model = "gemini_flash" },
     models = {
       gemini_flash = {
@@ -155,7 +155,7 @@ Configuration schema:
 ---@class Config
 ---@field models table<string, Model>
 ---@field allow_env_var_config boolean
----@field chat { system_prompt: string, default_model: string?, headers: { system: string, user: string, assistant: string } }
+---@field chat { system_prompt: string, default_model: string?, headers: { system: string, user: string, assistant: string }, scroll_on_send: boolean }
 ---@field rewrite { default_model: string? }
 ```
 
@@ -173,6 +173,7 @@ opts = {
       user = "User:",
       assistant = "Assistant:",
     },
+    scroll_on_send = true,
   },
   rewrite = {
     default_model = nil,

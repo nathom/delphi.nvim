@@ -64,7 +64,7 @@
                   cmd = { "Chat", "Rewrite" },
                   opts = {
                     allow_env_var_config = true,
-                    chat = { default_model = "gemini_flash" },
+                    chat = { default_model = "gemini_flash", scroll_on_send = true },
                     rewrite = { default_model = "gemini_flash" },
                     models = {
                       gemini_flash = {
