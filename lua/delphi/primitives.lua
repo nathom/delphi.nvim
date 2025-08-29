@@ -227,6 +227,39 @@ function P.set_cursor_to_user(buf)
 	end
 end
 
+---Scroll window(s) showing the buffer so the last User header is at top-of-window.
+---@param buf integer|nil
+---@return boolean did_scroll
+function P.scroll_last_user_to_top(buf)
+	buf = buf or 0
+	if not vim.api.nvim_buf_is_valid(buf) then
+		return false
+	end
+	local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+	local target_lnum = nil --[[@type integer?]]
+	for i = #lines, 1, -1 do
+		if lines[i]:match("^%s*" .. vim.pesc(P.headers.user)) then
+			target_lnum = i
+			break
+		end
+	end
+	if not target_lnum then
+		return false
+	end
+	local did = false
+	for _, win in ipairs(vim.api.nvim_list_wins()) do
+		if vim.api.nvim_win_get_buf(win) == buf then
+			did = true
+			vim.api.nvim_win_call(win, function()
+				local view = vim.fn.winsaveview()
+				view.topline = target_lnum
+				pcall(vim.fn.winrestview, view)
+			end)
+		end
+	end
+	return did
+end
+
 -- Read entire buffer into a single string
 ---@param buf integer
 ---@return string

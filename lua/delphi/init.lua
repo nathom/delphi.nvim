@@ -5,7 +5,7 @@
 ---@class Config
 ---@field models table<string, Model>
 ---@field allow_env_var_config boolean
----@field chat { system_prompt: string, default_model: string?, headers: { system: string, user: string, assistant: string } }
+---@field chat { system_prompt: string, default_model: string?, headers: { system: string, user: string, assistant: string }, scroll_on_send: boolean }
 ---@field rewrite { default_model: string? }
 local default_opts = {
 	models = {},
@@ -18,6 +18,7 @@ local default_opts = {
 			user = "User:",
 			assistant = "Assistant:",
 		},
+		scroll_on_send = true,
 	},
 	rewrite = {
 		default_model = nil,
@@ -144,6 +145,11 @@ local function setup_chat_cmd(config)
 		new_meta.stored_lines = cur_lines
 
 		P.write_chat_meta(vim.b.delphi_chat_path, new_meta)
+
+		-- Optionally scroll so the last User header is at the top
+		if config.scroll_on_send then
+			P.scroll_last_user_to_top(buf)
+		end
 
 		-- Add assistant header and start a right-aligned spinner on that line
 		P.append_line_to_buf(buf, "")
