@@ -31,10 +31,11 @@ local M = { opts = default_opts }
 ---Set chat send keymap
 ---@param buf integer
 function M.apply_chat_keymaps(buf)
-	local opts = { desc = "Delphi: send message", silent = true, buffer = buf }
-	vim.keymap.set("n", "<Plug>(DelphiChatSend)", function()
-		vim.cmd([[Chat]])
-	end, opts)
+	-- Delegate to primitives to keep all API usage centralized and idempotent.
+	-- This now applies a global <Plug> mapping so user keymaps work regardless
+	-- of how the chat buffer was opened (Telescope, Chat go, etc.).
+	local P = require("delphi.primitives")
+	P.apply_chat_plug_mappings()
 end
 
 local function get_delta(chunk)
@@ -202,6 +203,8 @@ local function setup_chat_cmd(config)
 			end,
 		})
 	end, { nargs = "*" })
+	-- Ensure global <Plug> mapping exists so user mappings always work.
+	require("delphi.primitives").apply_chat_plug_mappings()
 end
 
 local function setup_rewrite_cmd(config)
@@ -284,9 +287,9 @@ local function setup_rewrite_cmd(config)
 			})
 		end)
 	end, { range = true, desc = "LLM-rewrite the current visual selection or insert-at-cursor" })
-    -- Define <Plug> mappings once so users can bind ergonomically
-    require("delphi.primitives").apply_rewrite_plug_mappings()
-    end
+	-- Define <Plug> mappings once so users can bind ergonomically
+	require("delphi.primitives").apply_rewrite_plug_mappings()
+end
 
 ---Setup delphi
 ---@param opts Config

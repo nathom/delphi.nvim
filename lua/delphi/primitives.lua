@@ -20,6 +20,20 @@ function P.set_headers(hdrs)
 	end
 end
 
+---Ensure <Plug>-style mapping for Chat send exists globally.
+---@return nil
+function P.apply_chat_plug_mappings()
+	if vim.g.delphi_chat_plugs_applied then
+		return
+	end
+	vim.g.delphi_chat_plugs_applied = true
+
+	-- Normal mode: send chat (resolves context inside :Chat)
+	vim.keymap.set("n", "<Plug>(DelphiChatSend)", function()
+		vim.cmd([[Chat]])
+	end, { desc = "Delphi: send chat", silent = true })
+end
+
 ---Fill in a template string
 ---@param str string
 ---@param env table
