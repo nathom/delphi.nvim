@@ -30,6 +30,10 @@ function P.apply_chat_plug_mappings()
 
 	-- Normal mode: send chat (resolves context inside :Chat)
 	vim.keymap.set("n", "<Plug>(DelphiChatSend)", function()
+		local buf = vim.api.nvim_get_current_buf()
+		if not vim.b[buf].is_delphi_chat then
+			return
+		end
 		vim.cmd([[Chat]])
 	end, { desc = "Delphi: send chat", silent = true })
 end
