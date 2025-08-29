@@ -549,6 +549,23 @@ end
 
 local ghost_ns = vim.api.nvim_create_namespace("delphi_ghost_diff")
 
+-- Ensure inline diff highlight groups exist once
+local function ensure_inline_hls()
+	if vim.g.delphi_inline_hls_ready then
+		return
+	end
+	local ok, diffadd = pcall(vim.api.nvim_get_hl, 0, { name = "DiffAdd", link = false })
+	local fg = nil
+	if ok and type(diffadd) == "table" then
+		fg = diffadd.fg or diffadd.foreground
+	end
+	-- Added part: green-ish (from DiffAdd if available) + bold
+	vim.api.nvim_set_hl(0, "DelphiInlineAdd", { fg = fg, bold = true })
+	-- Deleted part: bold only (no color change)
+	vim.api.nvim_set_hl(0, "DelphiInlineDelete", { bold = true })
+	vim.g.delphi_inline_hls_ready = true
+end
+
 ---Start a ghost diff overlay for live preview while streaming new content.
 ---@param buf integer            Buffer handle
 ---@param start_lnum integer     1-based, inclusive start line of selection/insert
@@ -604,21 +621,94 @@ function P.start_ghost_diff(buf, start_lnum, end_lnum, left_lines)
 			pending_adds = {}
 		end
 
-		for _, l in ipairs(lines) do
+		ensure_inline_hls()
+
+		local i = 1
+		while i <= #lines do
+			local l = lines[i]
 			local tag = l:sub(1, 1)
 			local text = l:sub(3)
 			if tag == " " then
 				flush_adds()
 				row = row + 1
+				i = i + 1
 			elseif tag == "-" then
-				flush_adds()
-				vim.api.nvim_buf_set_extmark(buf, ghost_ns, row, 0, {
-					virt_text = { { text, "DiffDelete" } },
-					virt_text_pos = "overlay",
-				})
-				row = row + 1
+				-- Try to compress a single-line replacement with the following '+'
+				local nextl = lines[i + 1]
+				if nextl and nextl:sub(1, 1) == "+" then
+					local newtext = nextl:sub(3)
+					-- Compute simple inline regions via common prefix/suffix
+					local function common_prefix(a, b)
+						local m = math.min(#a, #b)
+						local j = 0
+						while j < m do
+							if a:sub(j + 1, j + 1) ~= b:sub(j + 1, j + 1) then
+								break
+							end
+							j = j + 1
+						end
+						return j
+					end
+					local function common_suffix(a, b, max_drop)
+						local m = math.min(#a, #b, max_drop)
+						local j = 0
+						while j < m do
+							if a:sub(#a - j, #a - j) ~= b:sub(#b - j, #b - j) then
+								break
+							end
+							j = j + 1
+						end
+						return j
+					end
+
+					local cp = common_prefix(text, newtext)
+					local max_drop = math.min(#text - cp, #newtext - cp)
+					local cs = common_suffix(text, newtext, max_drop)
+
+					local old_mid = text:sub(cp + 1, #text - cs)
+					local new_mid = newtext:sub(cp + 1, #newtext - cs)
+					local prefix = text:sub(1, cp)
+					local suffix = text:sub(#text - cs + 1)
+
+					local virt_text
+					if #old_mid > 0 and #new_mid == 0 then
+						-- Pure deletion: show original line with deleted part bold
+						virt_text = {
+							{ prefix, "Normal" },
+							{ old_mid, "DelphiInlineDelete" },
+							{ suffix, "Normal" },
+						}
+					else
+						-- Addition or substitution: show new line with added part bold+green
+						virt_text = {
+							{ prefix, "Normal" },
+							{ new_mid, "DelphiInlineAdd" },
+							{ newtext:sub(#newtext - cs + 1), "Normal" },
+						}
+					end
+
+					flush_adds()
+					vim.api.nvim_buf_set_extmark(buf, ghost_ns, row, 0, {
+						virt_text = virt_text,
+						virt_text_pos = "overlay",
+					})
+					row = row + 1
+					i = i + 2 -- consumed '-' and '+'
+				else
+					flush_adds()
+					vim.api.nvim_buf_set_extmark(buf, ghost_ns, row, 0, {
+						virt_text = { { text, "DiffDelete" } },
+						virt_text_pos = "overlay",
+					})
+					row = row + 1
+					i = i + 1
+				end
 			elseif tag == "+" then
 				pending_adds[#pending_adds + 1] = text
+				i = i + 1
+			else
+				-- Unknown tag; advance defensively
+				i = i + 1
 			end
 		end
 		flush_adds()
