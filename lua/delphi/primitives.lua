@@ -986,4 +986,68 @@ function P.build_rewrite_prompt(buf, start_lnum, end_lnum, prompt)
 	})
 end
 
+---Return the path of the current buffer, relative to CWD if possible.
+---@param buf integer|nil
+---@return string
+function P.current_file_path(buf)
+	buf = buf or 0
+	local name = vim.api.nvim_buf_get_name(buf) or ""
+	if name == "" then
+		return ""
+	end
+	-- Prefer a relative path for readability; fallback to absolute
+	local rel = vim.fn.fnamemodify(name, ":.")
+	if rel ~= nil and rel ~= "" and rel ~= name then
+		return rel
+	end
+	return vim.fn.fnamemodify(name, ":p")
+end
+
+---Replace the content following the last User header with given text.
+---@param buf integer
+---@param text string
+---@return boolean ok
+function P.set_last_user_content(buf, text)
+	if not vim.api.nvim_buf_is_valid(buf) then
+		return false
+	end
+	local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+	local user_lnum = nil -- 1-based
+	for i = #lines, 1, -1 do
+		if lines[i]:match("^%s*" .. vim.pesc(P.headers.user)) then
+			user_lnum = i
+			break
+		end
+	end
+	if not user_lnum then
+		return false
+	end
+	local end_lnum = #lines
+	local new = vim.split(text or "", "\n", { plain = true, trimempty = false })
+	-- Replace the region after the User header (exclusive) to end of buffer
+	vim.api.nvim_buf_set_lines(buf, user_lnum, end_lnum, false, new)
+	return true
+end
+
+---Ensure <Plug>-style mappings for Explain exist.
+---@return nil
+function P.apply_explain_plug_mappings()
+	if vim.g.delphi_explain_plugs_applied then
+		return
+	end
+	vim.g.delphi_explain_plugs_applied = true
+
+	-- Visual/Select: explain the current selection
+	vim.keymap.set({ "x", "s" }, "<Plug>(DelphiExplainSelection)", ":<C-u>Explain<CR>", {
+		desc = "Delphi: explain selection",
+		silent = true,
+	})
+
+	-- Normal: explain current line (single-line selection)
+	vim.keymap.set("n", "<Plug>(DelphiExplainAtCursor)", ":Explain<CR>", {
+		desc = "Delphi: explain at cursor",
+		silent = true,
+	})
+end
+
 return P
