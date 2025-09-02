@@ -699,6 +699,75 @@ function P.apply_rewrite_plug_mappings()
 	})
 end
 
+---Find mapped keys whose RHS targets a given <Plug> mapping.
+---@param plug string           -- e.g. "<Plug>(DelphiRewriteAccept)"
+---@param buf integer|nil       -- search buffer-local first, then global
+---@return string[]             -- list of LHS keys (buffer-local preferred order)
+---Echo a short, non-intrusive message without adding to command history.
+---@param msg string
+function P.echo(msg)
+	pcall(vim.api.nvim_echo, { { tostring(msg), "None" } }, false, {})
+end
+
+---Return a human-friendly key hint for the first mapping that targets a given <Plug>.
+---Searches buffer-local normal-mode maps first, then global normal maps.
+---@param plug string              -- e.g. "<Plug>(DelphiRewriteAccept)"
+---@param buf integer|nil          -- buffer handle (0 = current)
+---@param fallback string|nil      -- fallback key string to display if no mapping is found
+---@return string                  -- display-ready key hint (preserves <leader>/<localleader> if applicable)
+function P.mapping_hint_for_plug(plug, buf, fallback)
+	buf = buf or 0
+
+	---@param lhs string
+	---@return string
+	local function pretty(lhs)
+		if type(lhs) ~= "string" then
+			return ""
+		end
+		local leader = tostring(vim.g.mapleader or "\\")
+		local localleader = tostring(vim.g.maplocalleader or "\\")
+
+		local function with_prefix(token, pre)
+			if type(pre) == "string" and pre ~= "" and lhs:sub(1, #pre) == pre then
+				return token .. lhs:sub(#pre + 1)
+			end
+			return nil
+		end
+
+		-- Replace leading leader/localleader with tokens
+		return with_prefix("<leader>", leader) or with_prefix("<localleader>", localleader) or lhs
+	end
+
+	local function find_in_maps(maps)
+		for _, m in ipairs(maps or {}) do
+			if type(m.rhs) == "string" and m.rhs:find(plug, 1, true) then
+				return pretty(m.lhs)
+			end
+		end
+		return nil
+	end
+
+	local lhs = nil
+	local ok_local, local_maps = pcall(vim.api.nvim_buf_get_keymap, buf, "n")
+	if ok_local then
+		lhs = find_in_maps(local_maps)
+	end
+	if not lhs then
+		local ok_global, global_maps = pcall(vim.api.nvim_get_keymap, "n")
+		if ok_global then
+			lhs = find_in_maps(global_maps)
+		end
+	end
+
+	if lhs and lhs ~= "" then
+		return lhs
+	end
+	if type(fallback) == "string" and fallback ~= "" then
+		return pretty(fallback)
+	end
+	return plug
+end
+
 ---Register the cmp source for delphi path completion once, on demand.
 ---@return nil
 function P.ensure_cmp_source_registered()

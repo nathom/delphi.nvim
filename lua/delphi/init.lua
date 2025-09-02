@@ -269,21 +269,26 @@ local function setup_rewrite_cmd(config)
 						local map = vim.keymap.set
 						map("n", "<Plug>(DelphiRewriteAccept)", function()
 							diff.accept()
-							vim.notify("applied")
-						end, {
-							buffer = orig_buf,
-							desc = "Delphi: accept rewrite",
-							silent = true,
-						})
+							P.echo("")
+						end, { buffer = orig_buf, desc = "Delphi: accept rewrite", silent = true })
 						map("n", "<Plug>(DelphiRewriteReject)", function()
 							diff.reject()
-							vim.notify("rejected")
-						end, {
-							buffer = orig_buf,
-							desc = "Delphi: reject rewrite",
-							silent = true,
-						})
+							P.echo("")
+						end, { buffer = orig_buf, desc = "Delphi: reject rewrite", silent = true })
 						think_spinner:stop()
+
+						-- Show concise key hints that reflect actual mappings
+						local accept_hint = P.mapping_hint_for_plug(
+							"<Plug>(DelphiRewriteAccept)",
+							orig_buf,
+							M.opts.rewrite and M.opts.rewrite.accept_keymap
+						)
+						local reject_hint = P.mapping_hint_for_plug(
+							"<Plug>(DelphiRewriteReject)",
+							orig_buf,
+							M.opts.rewrite and M.opts.rewrite.reject_keymap
+						)
+						P.echo(string.format("%s to accept, %s to reject", accept_hint, reject_hint))
 					end
 					local new_code = extractor:update(get_delta(chunk))
 					if #new_code then
