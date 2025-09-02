@@ -53,6 +53,11 @@ function Extractor:update(delta)
 			elseif ch == "`" then
 				self.state = "OPEN_FENCE"
 				self.tick_count = 1
+			elseif ch == "<" then
+				-- Could be an immediate closing tag (empty content); don't emit yet
+				self.state = "MAYBE_END"
+				self.end_idx = 1
+				self.pending = "<"
 			else
 				out = out .. ch
 				self.code = self.code .. ch
@@ -67,10 +72,17 @@ function Extractor:update(delta)
 						self.state = "SKIP_LANG"
 					end
 				else
-					-- not actually a fence
-					out = out .. string.rep("`", self.tick_count) .. ch
-					self.code = self.code .. string.rep("`", self.tick_count) .. ch
-					self.state = "RECORDING"
+					-- not actually a fence; however, if the very next token is
+					-- a '<', it may be the closing tag for empty content.
+					if ch == "<" and self.tick_count == 0 then
+						self.state = "MAYBE_END"
+						self.end_idx = 1
+						self.pending = "<"
+					else
+						out = out .. string.rep("`", self.tick_count) .. ch
+						self.code = self.code .. string.rep("`", self.tick_count) .. ch
+						self.state = "RECORDING"
+					end
 					self.tick_count = 0
 				end
 			end
