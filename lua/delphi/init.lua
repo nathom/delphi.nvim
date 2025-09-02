@@ -7,9 +7,11 @@
 ---@field allow_env_var_config boolean
 ---@field chat { system_prompt: string, default_model: string?, headers: { system: string, user: string, assistant: string }, scroll_on_send: boolean }
 ---@field rewrite { default_model: string? }
+---@field max_prompt_window_width integer|nil
 local default_opts = {
 	models = {},
 	allow_env_var_config = false,
+	max_prompt_window_width = nil,
 	chat = {
 		system_prompt = "",
 		default_model = nil,
@@ -311,6 +313,7 @@ function M.setup(opts)
 	-- Configure primitives with headers (safe/lightweight)
 	local P = require("delphi.primitives")
 	P.set_headers(M.opts.chat.headers)
+	P.set_prompt_max_width(M.opts.max_prompt_window_width)
 	setup_chat_cmd(M.opts.chat)
 	setup_rewrite_cmd(M.opts.rewrite)
 end
