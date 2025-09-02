@@ -66,7 +66,11 @@
                 opts = {
                   allow_env_var_config = true,
                   max_prompt_window_width = 80,
-                  chat = { default_model = "gemini_flash", scroll_on_send = true },
+                  chat = {
+                    default_model = "gemini_flash",
+                    scroll_on_send = true,
+                    special_highlighting = { enabled = true },
+                  },
                   rewrite = { default_model = "gemini_flash" },
                   models = {
                     gemini_flash = {

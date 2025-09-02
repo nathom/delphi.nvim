@@ -5,7 +5,7 @@
 ---@class Config
 ---@field models table<string, Model>
 ---@field allow_env_var_config boolean
----@field chat { system_prompt: string, default_model: string?, headers: { system: string, user: string, assistant: string }, scroll_on_send: boolean }
+---@field chat { system_prompt: string, default_model: string?, headers: { system: string, user: string, assistant: string }, scroll_on_send: boolean, special_highlighting: { enabled: boolean, header_hl: string, tag_hl: string } }
 ---@field rewrite { default_model: string? }
 ---@field max_prompt_window_width integer|nil
 local default_opts = {
@@ -21,6 +21,11 @@ local default_opts = {
 			assistant = "Assistant:",
 		},
 		scroll_on_send = true,
+		special_highlighting = {
+			enabled = false,
+			header_hl = "DelphiChatHeader",
+			tag_hl = "DelphiFileTag",
+		},
 	},
 	rewrite = {
 		default_model = nil,
@@ -319,6 +324,7 @@ function M.setup(opts)
 	local P = require("delphi.primitives")
 	P.set_headers(M.opts.chat.headers)
 	P.set_prompt_max_width(M.opts.max_prompt_window_width)
+	P.set_highlight_opts(M.opts.chat.special_highlighting)
 	setup_chat_cmd(M.opts.chat)
 	setup_rewrite_cmd(M.opts.rewrite)
 end
