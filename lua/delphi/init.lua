@@ -304,6 +304,62 @@ local function setup_rewrite_cmd(config)
 	require("delphi.primitives").apply_rewrite_plug_mappings()
 end
 
+local function setup_explain_cmd()
+	vim.api.nvim_create_user_command("Explain", function()
+		local P = require("delphi.primitives")
+		local orig_buf = vim.api.nvim_get_current_buf()
+		local sel = P.get_visual_selection(orig_buf)
+		if #sel.lines == 0 then
+			return vim.notify("No visual selection found.", vim.log.levels.WARN)
+		end
+
+		P.show_popup("Explain prompt", function(user_prompt)
+			if user_prompt == "" then
+				vim.notify("Empty prompt")
+				return
+			end -- cancelled
+
+			-- Build the prompt with @-tagged file
+			local path = P.current_file_path(orig_buf)
+			local ft = vim.bo[orig_buf].filetype
+			local snippet = table.concat(sel.lines, "\n")
+			local user_msg = require("delphi.explain").build_prompt({
+				file_path = (path ~= "" and path or nil),
+				snippet = snippet,
+				language_name = ft,
+				user_prompt = user_prompt,
+			})
+
+			-- Create a new chat buffer, prefill content, and send
+			local system_prompt = M.opts.chat.system_prompt
+			local default_model
+			if M.opts.allow_env_var_config and os.getenv("DELPHI_DEFAULT_EXPLAIN_MODEL") then
+				default_model = os.getenv("DELPHI_DEFAULT_EXPLAIN_MODEL")
+			elseif M.opts.allow_env_var_config and os.getenv("DELPHI_DEFAULT_CHAT_MODEL") then
+				default_model = os.getenv("DELPHI_DEFAULT_CHAT_MODEL")
+			else
+				default_model = M.opts.chat.default_model
+			end
+			local model_cfg = M.opts.models[default_model] or {}
+
+			local b = P.open_new_chat_buffer(system_prompt, default_model, model_cfg.temperature)
+			vim.b.is_delphi_chat = true
+			vim.b.delphi_chat_path = P.next_chat_path()
+			vim.b.delphi_meta_path = vim.b.delphi_chat_path:gsub("%.md$", "_meta.json")
+			P.set_last_user_content(b, user_msg)
+			P.save_chat(b)
+
+			M.apply_chat_keymaps(b)
+
+			-- Kick off the chat streaming for this buffer
+			vim.cmd([[Chat]])
+		end)
+	end, { range = true, desc = "Explain the current visual selection via LLM" })
+
+	-- Define <Plug> mappings once for ergonomic usage
+	require("delphi.primitives").apply_explain_plug_mappings()
+end
+
 ---Setup delphi
 ---@param opts Config
 function M.setup(opts)
@@ -321,6 +377,7 @@ function M.setup(opts)
 	P.set_prompt_max_width(M.opts.max_prompt_window_width)
 	setup_chat_cmd(M.opts.chat)
 	setup_rewrite_cmd(M.opts.rewrite)
+	setup_explain_cmd()
 end
 
 return M

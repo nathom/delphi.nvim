@@ -59,10 +59,12 @@
                   { "<leader><cr>", "<Plug>(DelphiChatSend)", desc = "Delphi: send chat" },
                   { "<C-i>", "<Plug>(DelphiRewriteSelection)", mode = { "x", "s" }, desc = "Delphi: rewrite selection" },
                   { "<C-i>", "<Plug>(DelphiInsertAtCursor)", mode = { "n", "i" }, desc = "Delphi: insert at cursor" },
+                  { "<C-e>", "<Plug>(DelphiExplainSelection)", mode = { "x", "s" }, desc = "Delphi: explain selection" },
+                  { "<C-e>", "<Plug>(DelphiExplainAtCursor)", mode = { "n" }, desc = "Delphi: explain at cursor" },
                   { "<leader>a", "<Plug>(DelphiRewriteAccept)", desc = "Delphi: accept rewrite" },
                   { "<leader>R", "<Plug>(DelphiRewriteReject)", desc = "Delphi: reject rewrite" },
                 },
-                cmd = { "Chat", "Rewrite" },
+                cmd = { "Chat", "Rewrite", "Explain" },
                 opts = {
                   allow_env_var_config = true,
                   max_prompt_window_width = 80,
