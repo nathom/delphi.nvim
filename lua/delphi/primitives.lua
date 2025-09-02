@@ -11,6 +11,17 @@ P.headers = {
 ---@type integer|nil
 P.prompt_max_width = nil
 
+-- Optional highlighting configuration for chat buffers
+---@class DelphiHighlightOpts
+---@field enabled boolean
+---@field header_hl string
+---@field tag_hl string
+---@type DelphiHighlightOpts
+P.highlight_opts = { enabled = false, header_hl = "DelphiChatHeader", tag_hl = "DelphiFileTag" }
+
+---@type integer
+local chat_hl_ns = vim.api.nvim_create_namespace("delphi_chat_highlight")
+
 ---Override the default chat headers
 ---@param hdrs {system?:string,user?:string,assistant?:string}|nil
 function P.set_headers(hdrs)
@@ -32,6 +43,94 @@ function P.set_prompt_max_width(max_width)
 	else
 		P.prompt_max_width = nil
 	end
+end
+
+---Configure special highlighting for headers and @file tags in chat buffers.
+---@param opts DelphiHighlightOpts|nil
+function P.set_highlight_opts(opts)
+	if type(opts) ~= "table" then
+		return
+	end
+	local cfg = {
+		enabled = opts.enabled == true,
+		header_hl = type(opts.header_hl) == "string" and opts.header_hl or P.highlight_opts.header_hl,
+		tag_hl = type(opts.tag_hl) == "string" and opts.tag_hl or P.highlight_opts.tag_hl,
+	}
+	P.highlight_opts = cfg
+end
+
+---Ensure our default highlight groups are defined without overriding user customizations.
+local function ensure_default_highlight_groups()
+	pcall(vim.api.nvim_set_hl, 0, "DelphiChatHeader", { link = "Title", default = true })
+	pcall(vim.api.nvim_set_hl, 0, "DelphiFileTag", { link = "Directory", default = true })
+end
+
+---Refresh chat-specific highlights for a buffer.
+---@param buf integer
+function P.refresh_chat_highlighting(buf)
+	if not P.highlight_opts.enabled then
+		return
+	end
+	if not vim.api.nvim_buf_is_valid(buf) then
+		return
+	end
+	if vim.b[buf].is_delphi_chat ~= true then
+		return
+	end
+	ensure_default_highlight_groups()
+
+	vim.api.nvim_buf_clear_namespace(buf, chat_hl_ns, 0, -1)
+
+	local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+	local header_map = {
+		[P.headers.system] = true,
+		[P.headers.user] = true,
+		[P.headers.assistant] = true,
+	}
+	for i, l in ipairs(lines) do
+		-- header at start-of-line
+		for hdr, _ in pairs(header_map) do
+			if hdr ~= nil and hdr ~= "" and l:sub(1, #hdr) == hdr then
+				vim.api.nvim_buf_add_highlight(buf, chat_hl_ns, P.highlight_opts.header_hl, i - 1, 0, #hdr)
+				break
+			end
+		end
+		-- @file tags anywhere on the line (non-whitespace run)
+		local init = 1
+		while true do
+			local s, e = l:find("@%S+", init)
+			if not s then
+				break
+			end
+			vim.api.nvim_buf_add_highlight(buf, chat_hl_ns, P.highlight_opts.tag_hl, i - 1, s - 1, e)
+			init = e + 1
+		end
+	end
+end
+
+---Attach autocmds to keep chat highlighting up-to-date for a buffer.
+---@param buf integer
+function P.apply_chat_highlighting(buf)
+	if not P.highlight_opts.enabled then
+		return
+	end
+	if vim.b[buf].delphi_chat_hl_aug then
+		-- already attached
+		P.refresh_chat_highlighting(buf)
+		return
+	end
+	local aug = vim.api.nvim_create_augroup("DelphiChatHL_" .. tostring(buf), { clear = true })
+	vim.b[buf].delphi_chat_hl_aug = aug
+	local ev = { "BufWinEnter", "TextChanged", "TextChangedI", "InsertLeave" }
+	vim.api.nvim_create_autocmd(ev, {
+		group = aug,
+		buffer = buf,
+		callback = function()
+			P.refresh_chat_highlighting(buf)
+		end,
+		desc = "Delphi: refresh chat header and @file tag highlights",
+	})
+	P.refresh_chat_highlighting(buf)
 end
 
 ---Ensure <Plug>-style mapping for Chat send exists globally.
@@ -328,6 +427,9 @@ function P.open_new_chat_buffer(system_prompt, model_name, temperature)
 		cmp.setup.buffer({ sources = sources })
 	end
 
+	-- Apply optional highlighting overlays
+	pcall(P.apply_chat_highlighting, buf)
+
 	P.set_cursor_to_user(buf) -- jump to User prompt
 	vim.cmd("startinsert")
 	return buf
@@ -395,6 +497,9 @@ function P.open_chat_file(path)
 		end
 		cmp.setup.buffer({ sources = sources })
 	end
+
+	-- Apply optional highlighting overlays
+	pcall(P.apply_chat_highlighting, buf)
 
 	P.set_cursor_to_user(buf)
 	return buf
