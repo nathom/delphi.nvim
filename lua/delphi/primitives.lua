@@ -7,6 +7,10 @@ P.headers = {
 	assistant = "Assistant:",
 }
 
+-- Optional maximum width (in columns) for the multiline prompt popup
+---@type integer|nil
+P.prompt_max_width = nil
+
 ---Override the default chat headers
 ---@param hdrs {system?:string,user?:string,assistant?:string}|nil
 function P.set_headers(hdrs)
@@ -17,6 +21,16 @@ function P.set_headers(hdrs)
 		if type(v) == "string" then
 			P.headers[k] = v
 		end
+	end
+end
+
+---Set maximum width in columns for the prompt popup.
+---@param max_width integer|nil
+function P.set_prompt_max_width(max_width)
+	if type(max_width) == "number" and max_width > 0 then
+		P.prompt_max_width = math.floor(max_width)
+	else
+		P.prompt_max_width = nil
 	end
 end
 
@@ -496,6 +510,9 @@ function P.show_popup(label, cb)
 	cb = cb or function() end
 
 	local width = math.floor(vim.o.columns * 0.60)
+	if P.prompt_max_width ~= nil then
+		width = math.min(width, P.prompt_max_width)
+	end
 	local height = 5
 	local win = popup.create({ "" }, {
 		title = label,
